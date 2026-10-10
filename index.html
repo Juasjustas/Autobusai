@@ -380,6 +380,15 @@ function rpath(p,r){
   }
   const z=p[p.length-1]; return d+` L${f1(z[0])},${f1(z[1])}`;
 }
+/* direction arrows along a polyline: every ~110 px and at the very end */
+function arrowsFor(P,color,size=1){
+  const seg=[];let tot=0;for(let i=1;i<P.length;i++){const l=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);seg.push(l);tot+=l}
+  if(tot<30)return "";
+  const at=[];for(let d=70;d<tot-45;d+=110)at.push(d);at.push(tot-20);
+  return at.map(d=>{let i=0,acc=0;while(i<seg.length-1&&acc+seg[i]<d){acc+=seg[i];i++}
+    const t=seg[i]?(d-acc)/seg[i]:0,a=P[i],b=P[i+1],x=a[0]+(b[0]-a[0])*t,y=a[1]+(b[1]-a[1])*t,ang=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
+    return `<path d="M${5*size},0 L${-3.5*size},${-4*size} L${-1.5*size},0 L${-3.5*size},${4*size}Z" transform="translate(${f1(x)},${f1(y)}) rotate(${f1(ang)})" fill="var(${color})" stroke="var(--street)" stroke-width=".8" stroke-linejoin="round"/>`}).join("");
+}
 function inset(poly,k){const cx=poly.reduce((a,p)=>a+p[0],0)/4,cy=poly.reduce((a,p)=>a+p[1],0)/4;
   return poly.map(([x,y])=>{const dx=cx-x,dy=cy-y,l=Math.hypot(dx,dy);return [f1(x+dx*k/l),f1(y+dy*k/l)]}).join(" ")}
 
@@ -415,7 +424,7 @@ ROUTES.forEach((r,k)=>{
   const pts=laneOffset(r.nodes.map(([i,j])=>N[j][i]),o);
   const d=rpath(pts,12);
   rc+=`<path d="${d}" stroke-width="6.4"/>`;
-  rl+=`<path d="${d}" stroke="var(${r.c})" stroke-width="4"/>`;
+  rl+=`<path d="${d}" stroke="var(${r.c})" stroke-width="4"/>`+arrowsFor(pts,r.c,1.5);
   r.pts=pts;r.stops=[];
   r.sq.forEach((q,si)=>{
     const kk=r.skeys[si],nm=nameK(kk);r.stops.push(nm);
@@ -477,7 +486,7 @@ const MINI=(()=>{
     r.skeys=r.sq.map(q=>key(r.nodes[q]));r.pos={};r.skeys.forEach((kk,i)=>{r.pos[kk]=i;nn[kk]=D.names[i]});
     const pts=r.nodes.map(([i,j])=>N[j][i]);r.pts=pts;r.stops=D.names.slice();
     const d=rpath(pts,12);
-    rc+=`<path d="${d}" stroke-width="7.4"/>`;rl+=`<path d="${d}" stroke="var(${r.c})" stroke-width="5"/>`;
+    rc+=`<path d="${d}" stroke-width="7.4"/>`;rl+=`<path d="${d}" stroke="var(${r.c})" stroke-width="5"/>`+arrowsFor(pts,r.c,1.8);
     r.sq.forEach((q,si)=>{const kk=r.skeys[si],nm=D.names[si],p=pts[q],x=Math.min(W-8,Math.max(8,p[0])),y=Math.min(H-8,Math.max(8,p[1]));
       kxy[kk]??=[x,y];const big=si===0||si===r.sq.length-1||nm==="Centras"||nm==="Stotis";
       st+=`<g class="sdot" data-k="${kk}" data-x="${f1(x)}" data-y="${f1(y)}" data-n="${nm}" data-c="${r.c}"><circle cx="${f1(x)}" cy="${f1(y)}" r="10" fill="transparent"/><circle class="vis" cx="${f1(x)}" cy="${f1(y)}" r="${big?4.2:3.4}" fill="var(--street)" stroke="var(${r.c})" stroke-width="2"/></g>`});
@@ -550,7 +559,7 @@ function drawLegs(){
     if(!ok)j=r.skeys.length-1;
     const seg=r.pts.slice(r.sq[l.stop],r.sq[j]+1);
     if(seg.length>1){const pd=rpath(seg,12);
-      h+=`<path d="${pd}" stroke="var(--fg)" stroke-opacity=".2" stroke-width="15"/><path d="${pd}" stroke="var(${r.c})" stroke-width="7"${ok?"":` stroke-dasharray="1 11"`}/>`;}
+      h+=`<path d="${pd}" stroke="var(--fg)" stroke-opacity=".2" stroke-width="15"/><path d="${pd}" stroke="var(${r.c})" stroke-width="7"${ok?"":` stroke-dasharray="1 11"`}/>`+arrowsFor(seg,r.c,1.9);}
     /* remember when this bus is at every stop of the lit ride (shown when a dot is tapped) */
     const B=BUSES[l.bus];
     for(let k=l.stop;k<=j;k++){const kk=r.skeys[k],tm=l.time+B.off[k]-B.off[l.stop];
