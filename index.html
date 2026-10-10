@@ -41,6 +41,36 @@ body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px
 .mode{all:unset;box-sizing:border-box;cursor:pointer;padding:6px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:.88rem}
 .mode[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .mode:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+/* End-task button */
+:root{--red:#c62828;--red-fg:#fff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--red:#e04848}}
+:root[data-theme="dark"]{--red:#e04848}
+.endwrap{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.endbtn{all:unset;box-sizing:border-box;width:100%;text-align:center;padding:13px;border-radius:12px;background:var(--red);color:var(--red-fg);font-family:var(--display);font-weight:800;font-size:1.05rem;cursor:pointer}
+.endbtn:focus-visible,.endno:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+.endconfirm{border:2px solid var(--red);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.endconfirm p{margin:0;font-weight:600}
+.endconfirm .row2{display:flex;gap:8px}
+.endconfirm .endbtn{padding:10px}
+.endno{all:unset;box-sizing:border-box;flex:1;text-align:center;padding:10px;border-radius:12px;border:2px solid var(--line);font-weight:700;cursor:pointer}
+.phase{display:inline-flex;align-items:center;gap:6px}
+.summary{display:flex;flex-direction:column;gap:8px;margin:6px 0 0;padding:0;list-style:none}
+.summary li{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:10px;background:var(--accent-soft);font-weight:600}
+.summary .ok{color:var(--ok)}.summary .no{color:var(--err)}
+/* Tutorial overlay */
+#tut{position:fixed;inset:0;z-index:100}
+.tut-block{position:absolute;inset:0}
+.tut-ring{position:fixed;border:3px solid #ffd23f;border-radius:12px;box-shadow:0 0 0 9999px rgba(8,12,11,.58);pointer-events:none;transition:left .3s,top .3s,width .3s,height .3s}
+.tut-arrow{position:fixed;width:30px;height:48px;color:#ffd23f;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+@media (prefers-reduced-motion:no-preference){.tut-arrow{animation:tutb .8s ease-in-out infinite alternate}@keyframes tutb{from{translate:0 -6px}to{translate:0 4px}}}
+.tut-box{position:fixed;left:50%;transform:translateX(-50%);width:min(480px,calc(100% - 32px));background:var(--surface);color:var(--fg);border-radius:14px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:8px}
+.tut-step{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.tut-text{margin:0;font-weight:500;line-height:1.4}
+.tut-ctrl{display:flex;justify-content:space-between;gap:10px}
+.tut-ctrl button{all:unset;cursor:pointer;font-weight:700;padding:8px 14px;border-radius:10px}
+.tut-skip{color:var(--muted)}
+.tut-next{background:var(--accent);color:var(--accent-fg)}
+.tut-ctrl button:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
 /* Version: offset clicks — landing spot ring */
 .ghost{position:fixed;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;border:2px solid var(--fg);pointer-events:none;z-index:50;opacity:.55}
 @media (prefers-reduced-motion:no-preference){.ghost{animation:ghost .6s ease-out forwards}@keyframes ghost{from{transform:scale(.5);opacity:.7}to{transform:scale(1.6);opacity:0}}}
@@ -172,10 +202,10 @@ header p{margin:2px 0 0;color:var(--muted)}
     <h1>Pinigėnai</h1>
     <p>Miesto autobusų maršrutų žemėlapis</p>
   </header>
-  <div class="modes" id="modes" role="group" aria-label="Versija"></div>
+  <div class="modes" id="modes" role="group" aria-label="Versija" hidden></div>
   <div id="task"></div>
   <div class="mapbox" id="mapbox"></div>
-  <div class="label" style="text-align:center">Jūsų kelionė</div>
+  <div class="label" id="tripLabel" style="text-align:center">Jūsų kelionė</div>
   <div class="slots" id="slots"></div>
   <p class="hint" id="hint">Spauskite „Ieškoti“, pasirinkite autobusą ir stotelę, tada bakstelėkite išvykimo laiką. Jis atsiras laukelyje, o kelionė bus nupiešta žemėlapyje. Bakstelėkite stotelę ant nušviestos linijos, kad pamatytumėte, kada autobusas ten bus.</p>
   <div id="fb"></div>
@@ -183,9 +213,21 @@ header p{margin:2px 0 0;color:var(--muted)}
     <button class="go" id="go">Ieškoti</button>
     <button class="go alt" id="check" disabled>Tikrinti</button>
   </div>
+  <div class="endwrap" id="endwrap"></div>
 </div>
 
 <div class="wrap" id="viewRes" hidden></div>
+
+<div id="tut" hidden>
+  <div class="tut-block"></div>
+  <div class="tut-ring"></div>
+  <svg class="tut-arrow" viewBox="0 0 40 64" aria-hidden="true"><path d="M20 4v48M6 38l14 16 14-16" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div class="tut-box" role="dialog" aria-live="polite">
+    <div class="tut-step"></div>
+    <p class="tut-text"></p>
+    <div class="tut-ctrl"><button class="tut-skip" data-tskip>Praleisti</button><button class="tut-next" data-tnext>Toliau ›</button></div>
+  </div>
+</div>
 
 <script>
 /* Seeded random: the city, timetables and tasks are the same for everyone */
@@ -487,23 +529,34 @@ function slotsHTML(){
 function renderMap(){
   const T=TASKS[ti];
   const taskEl=document.getElementById("task");
-  if(!T){
-    taskEl.innerHTML=`<div class="task"><div class="label">Visos užduotys atliktos</div><div class="trip">Puiku! Visos ${TASKS.length} kelionės suplanuotos.</div></div>`;
-    document.getElementById("slots").innerHTML="";document.getElementById("hint").hidden=true;
-    document.getElementById("fb").innerHTML=`<div class="fb ok"><button class="go small" data-restart>Pradėti iš naujo</button></div>`;
-    document.getElementById("go").hidden=true;document.getElementById("check").hidden=true;
-    drawTaskMarks();drawLegs();return;
+  const showPlay=PHASE!=="done";
+  ["slots","hint","go","check","tripLabel"].forEach(id=>document.getElementById(id).hidden=!showPlay);
+  if(PHASE==="done"){
+    taskEl.innerHTML=`<div class="task"><div class="label">Pabaiga</div><div class="trip">Ačiū! Užduotys baigtos.</div>
+      <div class="meta">Jums teko šios sąlygos:</div>
+      <ul class="summary">${RESULTS.map((r,i)=>`<li><span>${i+1} užduotis: ${MODES.find(m=>m.id===r.mode).name}</span><span class="${r.ok?"ok":"no"}">${r.ok?"Įvykdyta":"Neįvykdyta"}</span></li>`).join("")}</ul></div>`;
+    document.getElementById("fb").innerHTML=`<button class="go small" data-restart>Pradėti iš naujo</button>`;
+    renderEnd();drawTaskMarks();drawLegs();return;
   }
-  document.getElementById("hint").hidden=false;document.getElementById("go").hidden=false;document.getElementById("check").hidden=false;
-  taskEl.innerHTML=`<div class="task"><div class="label">Užduotis ${ti+1} iš ${TASKS.length}</div>
+  const label=PHASE==="demo"?"Pavyzdys":PHASE==="practice"?`Mokomoji užduotis ${pi+1}`:PHASE==="cond1"?"1 užduotis":"2 užduotis";
+  taskEl.innerHTML=`<div class="task"><div class="label">${label}</div>
     <div class="trip">${nameK(T.a)}<span class="arrow">→</span>${nameK(T.b)}</div>
     <div class="meta">Stotelėje esate <b>${fmt(T.T0)}</b>. Atvykti reikia iki <b>${fmt(T.deadline)}</b>. Kelionė trimis skirtingais autobusais.</div></div>`;
   document.getElementById("slots").innerHTML=slotsHTML();
   document.getElementById("check").disabled=LEGS.length<3;
+  const nextLbl=PHASE==="practice"?"Kita mokomoji užduotis →":PHASE==="cond1"?"Toliau →":"Baigti";
   document.getElementById("fb").innerHTML=FB?(FB.ok
-    ?`<div class="fb ok"><strong>Teisingai!</strong><span>${FB.msg}</span><button class="go small" data-next>${ti+1<TASKS.length?"Kita užduotis →":"Baigti"}</button></div>`
+    ?`<div class="fb ok"><strong>Teisingai!</strong><span>${FB.msg}</span>${PHASE==="demo"?"":`<button class="go small" data-next>${nextLbl}</button>`}</div>`
     :`<div class="fb err"><strong>Dar ne visai.</strong><span>${FB.msg}</span></div>`):"";
-  drawTaskMarks();drawLegs();
+  renderEnd();drawTaskMarks();drawLegs();
+}
+function renderEnd(){
+  const w=document.getElementById("endwrap");
+  if(PHASE==="demo"||PHASE==="done"){w.innerHTML="";return}
+  const lbl=PHASE==="practice"?"Baigti mokomąją dalį":"Baigti užduotį";
+  w.innerHTML=CONFIRM
+    ?`<div class="endconfirm"><p>${PHASE==="practice"?"Ar tikrai norite baigti mokomąją dalį ir pereiti prie užduoties?":"Ar tikrai norite baigti šią užduotį?"}</p><div class="row2"><button class="endbtn" data-endyes>Taip, baigti</button><button class="endno" data-endno>Ne</button></div></div>`
+    :`<button class="endbtn" data-end>${lbl}</button>`;
 }
 
 function check(){
@@ -610,14 +663,103 @@ function show(res){
   document.getElementById("viewMap").hidden=res;V.hidden=!res;window.scrollTo(0,0);
   if(res){TOAST=null;st.bus=null;st.stop=null;st.trip=null;render()}else renderMap();
 }
-function startTask(i){ti=i;LEGS=[];FB=null;TOAST=null;st.bus=null;st.stop=null;st.trip=null;if(TASKS[ti])CHOSEN=Math.floor(TASKS[ti].T0/5)*5;renderMap()}
+/* ---------- Session flow: tutorial → practice → condition 1 → (if solved) condition 2 → summary ---------- */
+let PHASE="demo",CONDS=[],CONDTASKS=[],RESULTS=[],pi=0,CONFIRM=false;
+const PRACTICE=[1,2,3];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+function loadTask(i){ti=i;LEGS=[];FB=null;TOAST=null;CONFIRM=false;st.bus=null;st.stop=null;st.trip=null;
+  document.getElementById("viewMap").hidden=false;V.hidden=true;renderMap();window.scrollTo(0,0)}
+function newSession(){CONDS=shuffle(["grey","smush","offset"]);CONDTASKS=shuffle([4,5,6,7]).slice(0,2);RESULTS=[];pi=0}
+function startPractice(){PHASE="practice";setMode("normal");pi=0;loadTask(PRACTICE[0])}
+function startCond(n){PHASE="cond"+n;setMode(CONDS[n-1]);loadTask(CONDTASKS[n-1])}
+function finish(){PHASE="done";setMode("normal");ti=null;LEGS=[];FB=null;CONFIRM=false;
+  document.getElementById("viewMap").hidden=false;V.hidden=true;renderMap();window.scrollTo(0,0)}
+function endTask(){
+  if(PHASE==="practice"){startCond(1);return}
+  const solved=!!(FB&&FB.ok);RESULTS.push({mode:MODE,task:ti,ok:solved});
+  if(PHASE==="cond1"&&solved)startCond(2);else finish();
+}
+function nextAfterOk(){
+  if(PHASE==="practice"){pi=(pi+1)%PRACTICE.length;loadTask(PRACTICE[pi]);return}
+  RESULTS.push({mode:MODE,task:ti,ok:true});
+  if(PHASE==="cond1")startCond(2);else finish();
+}
 document.getElementById("go").addEventListener("click",()=>show(true));
 document.getElementById("check").addEventListener("click",()=>{check();renderMap()});
 document.getElementById("viewMap").addEventListener("click",e=>{
   const rm=e.target.closest("[data-rm]");if(rm){LEGS.splice(+rm.dataset.rm,1);FB=null;renderMap();return}
-  if(e.target.closest("[data-next]")){startTask(ti+1);window.scrollTo(0,0);return}
-  if(e.target.closest("[data-restart]")){startTask(0);window.scrollTo(0,0)}
+  if(e.target.closest("[data-next]")){nextAfterOk();return}
+  if(e.target.closest("[data-end]")){CONFIRM=true;renderEnd();return}
+  if(e.target.closest("[data-endno]")){CONFIRM=false;renderEnd();return}
+  if(e.target.closest("[data-endyes]")){CONFIRM=false;endTask();return}
+  if(e.target.closest("[data-restart]")){newSession();startTutorial()}
 });
+
+/* ---------- Tutorial: automatic demo of task 1 with a spotlight and arrow ---------- */
+const TUT=document.getElementById("tut");
+let tStep=0,tTimer=null,tSteps=[];
+const q=sel=>document.querySelector(sel);
+function tutSteps(){
+  const [L0,L1,L2]=TASKS[0].best.legs,xk=legKey(L1);
+  return [
+    {el:()=>q("#task .task"),text:`Čia jūsų užduotis: nuvykti iš ${nameK(TASKS[0].a)} į ${nameK(TASKS[0].b)}. Atvykti reikia iki nurodyto laiko, keliaujant trimis skirtingais autobusais.`},
+    {el:()=>q("#mapbox"),text:"Žemėlapyje tuščias apskritimas – pradžia, pilnas – tikslas. Spalvotos linijos – autobusų maršrutai."},
+    {el:()=>q("#go"),text:"Spauskite „Ieškoti“, kad atvertumėte autobusų tvarkaraščius.",act:true},
+    {el:()=>q(`[data-bus="${L0.bus}"]`),text:`Pasirinkite autobusą. ${BUSES[L0.bus].name} autobusas važiuoja pro pradžios stotelę.`,act:true},
+    {el:()=>q(`[data-stop="${L0.stop}"]`),text:"Pasirinkite stotelę, iš kurios važiuosite.",act:true},
+    {el:()=>q(`.grid [data-time="${L0.time}"]`),text:"Pasirinkite išvykimo laiką. Autobusas turi išvykti ne anksčiau, nei būsite stotelėje.",act:true},
+    {el:()=>q("#viewRes .stops"),text:"Dabar matote, kada šis autobusas bus kiekvienoje stotelėje. Spalvoti kvadratėliai rodo, kur galima persėsti.",noScroll:true},
+    {el:()=>q("[data-add]"),text:"Įtraukite šį reisą į savo kelionę.",act:true},
+    {el:()=>q('#viewRes .go[data-go="map"]'),text:"Grįžkite į žemėlapį.",act:true},
+    {el:()=>q("#slots"),text:"Reisas atsirado pirmame laukelyje, o maršrutas nušvito žemėlapyje."},
+    {el:()=>q(`.sdot[data-k="${xk}"]`),text:"Bakstelėkite stotelę ant nušviestos linijos – pamatysite, kada autobusas ten atvyks. Čia galima persėsti.",act:true,pad:14},
+    {pre:()=>{addLeg(L1.bus,L1.stop,L1.time);addLeg(L2.bus,L2.stop,L2.time);TOAST=null;renderMap()},el:()=>q("#slots"),text:"Taip pat pasirenkami dar du autobusai: nuo persėdimo stotelės iki tikslo."},
+    {el:()=>q("#check"),text:"Kai visi trys laukeliai užpildyti, spauskite „Tikrinti“.",act:true},
+    {el:()=>q("#fb"),text:"Teisingai! Dabar pabandykite patys. Kai baigsite, spauskite raudoną mygtuką apačioje.",last:true}
+  ];
+}
+function tutPlace(){
+  const s=tSteps[tStep];if(!s)return;const el=s.el&&s.el();const ring=TUT.querySelector(".tut-ring"),ar=TUT.querySelector(".tut-arrow"),box=TUT.querySelector(".tut-box");
+  if(!el){ring.style.cssText="left:50%;top:50%;width:0;height:0";ar.style.display="none";box.style.top="";box.style.bottom="16px";return}
+  const r=el.getBoundingClientRect(),pad=s.pad||6,vh=innerHeight;
+  ring.style.left=(r.left-pad)+"px";ring.style.top=(r.top-pad)+"px";ring.style.width=(r.width+2*pad)+"px";ring.style.height=(r.height+2*pad)+"px";
+  const cx=r.left+r.width/2,big=r.height>vh*.55;
+  ar.style.display=big?"none":"";ar.style.left=(cx-15)+"px";
+  if(r.top>90){ar.style.top=(r.top-pad-54)+"px";ar.style.transform=""}else{ar.style.top=(r.bottom+pad+6)+"px";ar.style.transform="rotate(180deg)"}
+  const lower=(r.top+r.height/2)>vh/2;
+  if(lower&&!big){box.style.top="16px";box.style.bottom=""}else{box.style.top="";box.style.bottom="16px"}
+}
+function tutShow(){
+  clearTimeout(tTimer);const s=tSteps[tStep];if(!s){endTutorial();return}
+  if(s.pre)s.pre();
+  TUT.querySelector(".tut-step").textContent=`Pavyzdys · ${tStep+1} / ${tSteps.length}`;
+  TUT.querySelector(".tut-text").textContent=s.text;
+  TUT.querySelector(".tut-next").textContent=s.last?"Pradėti ›":"Toliau ›";
+  TUT.querySelector(".tut-skip").hidden=!!s.last;
+  const el=s.el&&s.el();
+  if(el&&!s.noScroll)el.scrollIntoView({block:"center",behavior:"instant"});
+  else if(el&&s.noScroll)window.scrollTo({top:Math.max(0,el.getBoundingClientRect().top+scrollY-140),behavior:"instant"});
+  requestAnimationFrame(tutPlace);
+  if(!s.last)tTimer=setTimeout(tutAdvance,Math.max(3200,s.text.length*45));
+}
+function tutAdvance(){
+  clearTimeout(tTimer);const s=tSteps[tStep];if(!s)return;
+  if(s.last){endTutorial();return}
+  if(s.act){const el=s.el();if(el)el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window}))}
+  tStep++;setTimeout(tutShow,s.act?380:120);
+}
+function startTutorial(){
+  PHASE="demo";setMode("normal");loadTask(0);
+  tSteps=tutSteps();tStep=0;TUT.hidden=false;tutShow();
+}
+function endTutorial(){clearTimeout(tTimer);TUT.hidden=true;startPractice()}
+TUT.addEventListener("click",e=>{
+  if(e.target.closest("[data-tskip]")){endTutorial();return}
+  if(e.target.closest("[data-tnext]")){tutAdvance()}
+});
+addEventListener("scroll",()=>{if(!TUT.hidden)tutPlace()},{passive:true});
+addEventListener("resize",()=>{if(!TUT.hidden)tutPlace()});
+
 const MODES=[{id:"normal",name:"Įprasta"},{id:"grey",name:"Daltonizmas"},{id:"smush",name:"Neryškus tekstas"},{id:"offset",name:"Netikslūs paspaudimai"}];
 let MODE="normal";
 function setMode(id){
@@ -625,25 +767,24 @@ function setMode(id){
   MODE=MODES.some(m=>m.id===id)?id:"normal";
   document.documentElement.dataset.mode=MODE;
   document.getElementById("modes").innerHTML=`<span class="label">Versija</span>`+MODES.map(m=>`<button class="mode" data-mode="${m.id}" aria-pressed="${m.id===MODE}">${m.name}</button>`).join("");
-  try{history.replaceState(null,"",location.pathname+location.search+(MODE==="normal"?"":"#"+MODE))}catch(e){}
 }
 /* Offset clicks: pattern below, below, above (repeats) */
 const OFFPX=40;let OFFN=0,redirecting=false;
 function ghost(x,y){const g=document.createElement("div");g.className="ghost";g.style.left=x+"px";g.style.top=y+"px";document.body.appendChild(g);setTimeout(()=>g.remove(),650)}
 window.addEventListener("click",e=>{
   if(MODE!=="offset"||redirecting||e.detail===0)return;
-  if(e.target.closest&&e.target.closest(".modes,select,label"))return;
+  if(e.target.closest&&e.target.closest(".modes,select,label,.endwrap,#tut"))return;
   const dy=[OFFPX,OFFPX,-OFFPX][OFFN%3];OFFN++;
   e.preventDefault();e.stopImmediatePropagation();
   const x=e.clientX,y=e.clientY+dy;ghost(x,y);
   const el=document.elementFromPoint(x,y);
-  if(!el||el.closest(".modes,select,label"))return;
+  if(!el||el.closest(".modes,select,label,.endwrap,#tut"))return;
   redirecting=true;
   try{el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window,clientX:x,clientY:y,detail:1}))}finally{redirecting=false}
 },true);
 document.getElementById("modes").addEventListener("click",e=>{const b=e.target.closest("[data-mode]");if(b)setMode(b.dataset.mode)});
-setMode((location.hash||"").slice(1));
-startTask(0);
+newSession();
+startTutorial();
 </script>
 
 </body>
