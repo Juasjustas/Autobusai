@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>*,*::before,*::after{box-sizing:border-box}html{color-scheme:light}body{margin:0;font-family:system-ui,sans-serif;font-size:14px}img{max-width:100%}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<title>Pinigėnai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one phone-width column — task card, city map, three ride slots, search/check; schedule views reuse the slot tray */
+:root{
+  --bg:#eef1ee; --surface:#ffffff; --fg:#17201e; --muted:#5d6a67; --line:#d5dcd8;
+  --accent:#0b6e5f; --accent-fg:#ffffff; --accent-soft:#dcede9;
+  --ok:#1d7a3a; --ok-soft:#dff1e3; --err:#b4231b; --err-soft:#fbe3e0;
+  --land:#e8ebe4; --block:#dce1d8; --park:#c5deb3; --water:#a8cde6; --street:#ffffff; --casing:#c9cfc6; --maplabel:#5f6a5d;
+  --r1:#e02424; --r2:#f2b705; --r3:#1f9d3a; --r4:#1560d6; --r5:#9b35c9; --r6:#8a5527;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1514; --surface:#18211f; --fg:#e5eeec; --muted:#93a39f; --line:#2b3936;
+  --accent:#4fc2ad; --accent-fg:#06221d; --accent-soft:#1c3330;
+  --ok:#5fd680; --ok-soft:#173322; --err:#ff8a80; --err-soft:#3a1d1b;
+  --land:#1a2120; --block:#222b29; --park:#22372a; --water:#1d3a50; --street:#3a4744; --casing:#121817; --maplabel:#98a8a4;
+  --r1:#ff4d4d; --r2:#ffc928; --r3:#3ccf62; --r4:#4d8dff; --r5:#c46cf0; --r6:#c4844f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1514; --surface:#18211f; --fg:#e5eeec; --muted:#93a39f; --line:#2b3936;
+  --accent:#4fc2ad; --accent-fg:#06221d; --accent-soft:#1c3330;
+  --ok:#5fd680; --ok-soft:#173322; --err:#ff8a80; --err-soft:#3a1d1b;
+  --land:#1a2120; --block:#222b29; --park:#22372a; --water:#1d3a50; --street:#3a4744; --casing:#121817; --maplabel:#98a8a4;
+  --r1:#ff4d4d; --r2:#ffc928; --r3:#3ccf62; --r4:#4d8dff; --r5:#c46cf0; --r6:#c4844f; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:18px 36px;display:flex;flex-direction:column;gap:16px}
+header h1{font-family:var(--display);font-weight:800;font-size:1.9rem;margin:0;letter-spacing:-.015em}
+header p{margin:2px 0 0;color:var(--muted)}
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.note{color:var(--muted);font-size:.82rem;margin:0}
+
+/* task card */
+.task{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.task .trip{font-family:var(--display);font-weight:800;font-size:1.3rem;line-height:1.2;text-wrap:balance}
+.task .arrow{color:var(--accent);padding-inline:4px}
+.task .meta{color:var(--muted);font-size:.88rem}
+.task .meta b{color:var(--fg);font-variant-numeric:tabular-nums}
+
+.mapbox{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--land)}
+.mapbox svg{display:block;width:100%;height:auto;max-width:100%}
+.sdot{cursor:pointer}
+.blip{transform-box:fill-box;transform-origin:center;opacity:.5}
+@media (prefers-reduced-motion:no-preference){.blip{animation:blip 1.8s ease-out infinite}@keyframes blip{0%{transform:scale(.8);opacity:.7}100%{transform:scale(2);opacity:0}}}
+.sdot:hover .vis{stroke-width:2.6}
+
+/* ride slots */
+.slots{display:flex;align-items:stretch;gap:6px}
+.plus{align-self:center;font-family:var(--display);font-size:1.4rem;font-weight:700;color:var(--muted)}
+.slot{all:unset;box-sizing:border-box;flex:1;min-width:0;min-height:76px;border:2.5px solid var(--fg);border-radius:12px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:8px 4px;text-align:center;position:relative}
+.slot.full{background:var(--rc);border-color:var(--rc);color:var(--rc-fg);cursor:pointer}
+.slot .x{position:absolute;top:0;right:6px;font-size:1rem;font-weight:700}
+.stime{font-family:var(--display);font-weight:800;font-size:1.25rem;font-variant-numeric:tabular-nums;line-height:1.1}
+.sstop{font-size:.74rem;line-height:1.15;overflow-wrap:anywhere}
+.snum{color:var(--muted);font-family:var(--display);font-weight:700;font-size:1.1rem}
+.slot:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{margin:0;text-align:center;color:var(--muted);font-size:.86rem}
+
+.fb{border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;font-weight:500}
+.fb.err{background:var(--err-soft);color:var(--err)}
+.fb.ok{background:var(--ok-soft);color:var(--ok)}
+.fb strong{font-family:var(--display);font-size:1.1rem}
+
+.btns{display:flex;flex-direction:column;gap:10px}
+.go{all:unset;box-sizing:border-box;width:100%;text-align:center;padding:15px;border-radius:12px;font-family:var(--display);font-weight:800;font-size:1.3rem;cursor:pointer;background:var(--accent);color:var(--accent-fg)}
+.go.alt{background:var(--surface);color:var(--fg);box-shadow:inset 0 0 0 2.5px var(--fg);font-size:1.1rem;padding:12px}
+.go[disabled]{background:var(--surface);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line);cursor:default}
+.go.small{font-size:1rem;padding:10px}
+.go:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+
+/* schedule views */
+.back{all:unset;cursor:pointer;color:var(--accent);font-weight:600;align-self:flex-start}
+.back:focus-visible,.row:focus-visible,.stop:focus-visible,.tbtn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tray{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.tray .slot{min-height:58px;border-width:2px}
+.tray .stime{font-size:1.02rem}
+.tray .sstop{font-size:.68rem}
+.toast{border-radius:8px;padding:7px 10px;font-size:.85rem;font-weight:500;background:var(--accent-soft)}
+.toast.warn{background:var(--err-soft);color:var(--err)}
+.picker{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px}
+.picker label{margin-right:auto}
+.picker select{font-family:var(--display);font-weight:700;font-size:1.2rem;font-variant-numeric:tabular-nums;background:var(--accent-soft);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:3px 8px}
+.colon{font-family:var(--display);font-weight:800;font-size:1.2rem}
+.list{display:flex;flex-direction:column;gap:10px}
+.row{all:unset;box-sizing:border-box;display:grid;grid-template-columns:52px minmax(0,1fr);gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;width:100%}
+.row:hover{border-color:var(--accent)}
+.bus{width:52px;height:52px;border-radius:10px;display:grid;place-items:center;flex:none}
+.bus svg{width:32px;height:32px}
+.info{min-width:0;display:flex;flex-direction:column;gap:4px}
+.bname{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--muted)}
+.rname{font-weight:600;font-size:.95rem}
+.top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.big{font-family:var(--display);font-weight:800;font-size:1.5rem;font-variant-numeric:tabular-nums;line-height:1}
+.in{color:var(--muted);font-size:.85rem}
+.rhead{display:flex;gap:14px;align-items:center}
+.rhead h1{font-size:1.3rem;text-wrap:balance}
+.stops{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding-block:6px}
+.stop{all:unset;box-sizing:border-box;display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 14px;cursor:pointer;position:relative}
+.stop:hover{background:var(--accent-soft)}
+.stop::before{content:"";position:absolute;left:25px;top:0;bottom:0;width:4px;background:var(--rc)}
+.stop:first-child::before{top:50%}.stop:last-child::before{bottom:50%}
+.dot{width:12px;height:12px;border-radius:50%;border:3px solid var(--rc);background:var(--surface);justify-self:center;z-index:1}
+.stop:first-child .dot,.stop:last-child .dot{background:var(--rc)}
+.sn{min-width:0;font-weight:500;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.xfer{display:inline-flex;gap:3px}
+.xfer i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.tag{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:5px;background:var(--fg);color:var(--bg)}
+.snx{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.85rem;text-align:right}
+.upcoming{display:flex;gap:8px;flex-wrap:wrap}
+.tbtn{all:unset;box-sizing:border-box;cursor:pointer;font-variant-numeric:tabular-nums}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-weight:500}
+.chip.first{background:var(--rc);color:var(--rc-fg);border-color:var(--rc);font-weight:700}
+.chip small{font-size:.75rem;margin-left:6px;font-weight:500}
+.chip:hover{border-color:var(--fg)}
+.grid{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.hr{display:grid;grid-template-columns:52px minmax(0,1fr);border-top:1px solid var(--line)}
+.hr:first-child{border-top:0}
+.h{font-family:var(--display);font-weight:700;font-size:1.05rem;padding:8px 0;text-align:center;background:var(--accent-soft);font-variant-numeric:tabular-nums}
+.ms{display:flex;flex-wrap:wrap;gap:4px 8px;padding:7px 10px;align-items:center}
+.ms .tbtn{padding:2px 6px;border-radius:5px}
+.ms .tbtn:hover{background:var(--accent-soft)}
+.ms .past{opacity:.45}
+.ms .nx{background:var(--rc);color:var(--rc-fg);font-weight:700}
+.ms .picked,.chip.picked{outline:2px solid var(--fg);outline-offset:1px}
+.sec{display:flex;flex-direction:column;gap:10px}
+.wc{width:14px;height:14px;vertical-align:-2px;margin-left:3px;flex:none}
+.slot .wc{width:15px;height:15px;margin:0 0 0 3px}
+.stime{display:inline-flex;align-items:center}
+.top .wc{width:18px;height:18px;align-self:center}
+.legend{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.82rem}
+.legend .wc{width:16px;height:16px;color:var(--fg)}
+@media (max-width:380px){.stime{font-size:1.05rem}.sstop{font-size:.68rem}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap" id="viewMap">
+  <header>
+    <h1>Pinigėnai</h1>
+    <p>Miesto autobusų maršrutų žemėlapis</p>
+  </header>
+  <div id="task"></div>
+  <div class="mapbox" id="mapbox"></div>
+  <div class="label" style="text-align:center">Jūsų kelionė</div>
+  <div class="slots" id="slots"></div>
+  <p class="hint" id="hint">Spauskite „Ieškoti“, pasirinkite autobusą ir stotelę, tada bakstelėkite išvykimo laiką. Jis atsiras laukelyje, o kelionė bus nupiešta žemėlapyje.</p>
+  <div id="fb"></div>
+  <div class="btns">
+    <button class="go" id="go">Ieškoti</button>
+    <button class="go alt" id="check" disabled>Tikrinti</button>
+  </div>
+</div>
+
+<div class="wrap" id="viewRes" hidden></div>
+
+<script>
+/* Seeded random: the city, timetables and tasks are the same for everyone */
+function rng(s){return function(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(20261009);
+const W=520,H=650,M=20,C=12,RW=15;
+const sx=(W-2*M)/C, sy=(H-2*M)/RW;
+const AV_ROW=7, AV_COL=6;
+
+const N=[];
+for(let j=0;j<=RW;j++){N[j]=[];for(let i=0;i<=C;i++){
+  const jx=(i>0&&i<C)?(R()-.5)*16:0, jy=(j>0&&j<RW)?(R()-.5)*16:0;
+  N[j][i]=[M+i*sx+jx, M+j*sy+jy];
+}}
+const E=new Set();
+for(let j=0;j<=RW;j++)for(let i=0;i<C;i++){if(j===0||j===RW||j===AV_ROW||R()>.15)E.add(`h${i},${j}`)}
+for(let j=0;j<RW;j++)for(let i=0;i<=C;i++){if(i===0||i===C||i===AV_COL||R()>.15)E.add(`v${i},${j}`)}
+const ek=(i,j,di,dj)=>di?`h${Math.min(i,i+di)},${j}`:`v${i},${Math.min(j,j+dj)}`;
+
+const ROUTES=[{c:"--r1",h:false},{c:"--r2",h:true},{c:"--r3",h:true},{c:"--r4",h:true},{c:"--r5",h:true},{c:"--r6",h:false}];
+const usedStarts=new Set();
+function walk(h){
+  const maxF=h?C:RW, maxL=h?RW:C;
+  let l; do{l=2+Math.floor(R()*(maxL-3))}while(usedStarts.has(h+":"+l)); usedStarts.add(h+":"+l);
+  let f=0,last=null,streak=0; const pts=[[f,l]], seen=new Set([f+","+l]);
+  const at=(f,l)=>h?[f,l]:[l,f];
+  const has=(f,l,df,dl)=>{const [i,j]=at(f,l);const [di,dj]=h?[df,dl]:[dl,df];return E.has(ek(i,j,di,dj))};
+  let guard=0;
+  while(f<maxF&&guard++<80){
+    const opts=[];
+    if(has(f,l,1,0))opts.push([1,0,3]);
+    for(const d of [-1,1]){const nl=l+d;
+      if(nl>=1&&nl<=maxL-1&&has(f,l,0,d)&&!seen.has(f+","+nl)&&!(last&&last[1]===-d)&&streak<3)opts.push([0,d,1.4]);}
+    let pick;
+    if(!opts.length){pick=[1,0];const [i,j]=at(f,l);E.add(ek(i,j,...(h?[1,0]:[0,1])));}
+    else{let tot=opts.reduce((a,o)=>a+o[2],0),r=R()*tot;pick=opts.find(o=>(r-=o[2])<0)||opts[0];}
+    streak=pick[0]?0:streak+1; last=pick; f+=pick[0]; l+=pick[1];
+    seen.add(f+","+l); pts.push([f,l]);
+  }
+  return pts.map(([f,l])=>at(f,l));
+}
+ROUTES.forEach(r=>r.nodes=walk(r.h));
+const OFF=[-5,-3,-1,1,3,5];
+
+/* Stops: every second intersection, the ends, and every place where routes meet (transfer points) */
+const key=nd=>nd[0]+","+nd[1];
+const cnt={};ROUTES.forEach(r=>new Set(r.nodes.map(key)).forEach(k=>cnt[k]=(cnt[k]||0)+1));
+ROUTES.forEach(r=>{
+  r.sq=[];r.nodes.forEach((nd,q)=>{if(q===0||q===r.nodes.length-1||q%2===0||cnt[key(nd)]>1)r.sq.push(q)});
+  r.skeys=r.sq.map(q=>key(r.nodes[q]));r.pos={};r.skeys.forEach((k,i)=>r.pos[k]=i);
+});
+
+/* Timetables: one direction per route, 8:00–22:00 */
+const COLORNAME=["Raudonas","Geltonas","Žalias","Mėlynas","Violetinis","Rudas"];
+const BUSES=ROUTES.map((r,k)=>({r:k,c:r.c,fg:r.c==="--r2"?"#2a2100":"#fff",name:COLORNAME[k]}));
+const TR=rng(8222026);
+const rnd=(a,b)=>a+Math.floor(TR()*(b-a+1));
+BUSES.forEach(b=>{
+  const n=ROUTES[b.r].skeys.length;
+  b.dep=[];let m=8*60+rnd(0,15);while(m<=22*60){b.dep.push(m);m+=rnd(18,45)}
+  b.off=[0];for(let k=1;k<n;k++)b.off.push(b.off[k-1]+rnd(2,4));
+});
+const AR=rng(4242);
+BUSES.forEach(b=>b.acc=b.dep.map(()=>AR()<.45));
+const isAcc=(b,k,m)=>!!b.acc[b.dep.indexOf(m-b.off[k])];
+const WC=`<svg class="wc" viewBox="0 0 24 24" role="img" aria-label="Pritaikyta žmonėms su vežimėliu"><title>Pritaikyta žmonėms su vežimėliu</title><circle cx="10" cy="3.6" r="2.2" fill="currentColor"/><path d="M10 7.5v6h5.5l2.8 6.2 2.2-1" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 10.5h4.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M7.2 10.2a5.6 5.6 0 1 0 7.6 7.4" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg>`;
+const timesAt=(b,i)=>b.dep.map(d=>d+b.off[i]).filter(m=>m<=22*60);
+const firstDep=(b,i,t)=>timesAt(b,i).find(m=>m>=t);
+
+/* Tasks: start/end pairs that need exactly three buses */
+function legsFrom(a){const d={[a]:0};let fr=[a],lv=0;
+  while(fr.length){lv++;const nx=[];
+    for(const s of fr)for(const r of ROUTES){const p=r.pos[s];if(p===undefined)continue;
+      for(let i=p+1;i<r.skeys.length;i++){const t=r.skeys[i];if(d[t]===undefined){d[t]=lv;nx.push(t)}}}
+    fr=nx}
+  return d}
+function chains(a,b){const out=[];
+  for(let A=0;A<6;A++){const RA=ROUTES[A],pa=RA.pos[a];if(pa===undefined)continue;
+    for(let i=pa+1;i<RA.skeys.length;i++){const t1=RA.skeys[i];
+      for(let B=0;B<6;B++){if(B===A)continue;const RB=ROUTES[B],pb=RB.pos[t1];if(pb===undefined)continue;
+        for(let j=pb+1;j<RB.skeys.length;j++){const t2=RB.skeys[j];
+          for(let Cc=0;Cc<6;Cc++){if(Cc===A||Cc===B)continue;const RC=ROUTES[Cc],pc=RC.pos[t2],pe=RC.pos[b];
+            if(pc!==undefined&&pe!==undefined&&pe>pc)out.push({A,B,C:Cc,t1,t2});}}}}}
+  return out}
+function evalChain(ch,a,b,T0){let t=T0;const legs=[];
+  const ride=(k,from,to)=>{const Rr=ROUTES[k],i=Rr.pos[from],j=Rr.pos[to],d=firstDep(BUSES[k],i,t);
+    if(d===undefined)return false;legs.push({bus:k,stop:i,time:d});t=d+BUSES[k].off[j]-BUSES[k].off[i];return t<=22*60};
+  if(!ride(ch.A,a,ch.t1)||!ride(ch.B,ch.t1,ch.t2)||!ride(ch.C,ch.t2,b))return null;
+  return {arr:t,legs}}
+const allStops=[...new Set(ROUTES.flatMap(r=>r.skeys))];
+let cands=[];
+for(const a of allStops){const d=legsFrom(a);for(const b of allStops)if(d[b]===3)cands.push([a,b])}
+if(cands.length<3)for(const a of allStops){const d=legsFrom(a);for(const b of allStops)if(d[b]===2)cands.push([a,b])}
+const TRk=rng(777);for(let i=cands.length-1;i>0;i--){const j=Math.floor(TRk()*(i+1));[cands[i],cands[j]]=[cands[j],cands[i]]}
+const STARTS=[9*60,12*60+20,16*60+40,8*60+15,10*60+45,14*60+5,18*60+30,11*60+30];
+const NT=STARTS.length;
+const TASKS=[];const usedK=new Set();
+for(const pass of [0,1])for(const [a,b] of cands){
+  if(TASKS.length===NT)break;
+  if(pass===0&&(usedK.has(a)||usedK.has(b)))continue;
+  if(TASKS.some(t=>(t.a===a&&t.b===b)||t.a===a))continue;
+  const T0=STARTS[TASKS.length];let best=null;
+  for(const ch of chains(a,b)){const e=evalChain(ch,a,b,T0);if(e&&(!best||e.arr<best.arr))best={...e,ch}}
+  if(!best)continue;
+  TASKS.push({a,b,T0,best,deadline:Math.ceil((best.arr+10)/5)*5});usedK.add(a);usedK.add(b);
+}
+
+/* Stop names (first task uses Kopų g. → Varpo g. with a change at Klevų g.) */
+let NAMES=["Turgaus aikštė","Liepų g.","Malūno g.","Vingės krantinė","Rotušės a.","Ąžuolų g.","Mokyklos g.","Ligoninė","Stotis","Kalno g.","Pušyno g.","Bažnyčios g.","Sodų g.","Tilto g.","Universitetas","Parko g.","Jaunimo g.","Biblioteka","Pilies g.","Senoji pirtis","Vilties g.","Beržų g.","Dariaus ir Girėno g.","Žvejų g.","Pinigų kalnelis","Amatų g.","Saulės g.","Poliklinika","Sporto rūmai","Šaltinio g.","Kultūros namai","Vaistinė","Paštas","Lentpjūvės g.","Gėlių g.","Vėjo g.","Muziejus","Rasos g.","Kepyklos g.","Vandentiekio g.","Dvaro g.","Ežero g.","Pievų g.","Statybininkų g.","Kalvių g.","Akacijų g.","Teatras","Naujoji g.","Rūtų g.","Upės g.","Pramonės g.","Miško g.","Aušros g.","Žalioji a.","Kapinių g.","Rinkos g.","Gamyklos g.","Smilgų g.","Tvenkinio g.","Obelų g.","Laisvės pr.","Švyturio g.","Debesų g.","Lakštingalų g.","Kiemelio g.","Gaisrinė","Vienuolyno g.","Pelkių g.","Ramybės g.","Arklių g.","Malūnėlių žiedas","Vyšnių g.","Šilo g.","Girios g.","Uosių g.","Medžiotojų g.","Kaštonų g.","Lygumų g.","Melioratorių g.","Žiedų g.","Kranto g.","Šviesos g.","Pavasario g.","Ūkio g."];
+const NR=rng(5150);for(let i=NAMES.length-1;i>0;i--){const j=Math.floor(NR()*(i+1));[NAMES[i],NAMES[j]]=[NAMES[j],NAMES[i]]}
+const nodeName={};
+if(TASKS[0]){nodeName[TASKS[0].a]="Kopų g.";nodeName[TASKS[0].b]="Varpo g.";nodeName[TASKS[0].best.ch.t1]="Klevų g.";}
+let ni=0;
+const nameK=k=>nodeName[k]??=(NAMES[ni++]||("Stotelė "+ni));
+
+/* ---------- Map drawing ---------- */
+const f1=n=>Math.round(n*10)/10;
+function rpath(p,r){
+  let d=`M${f1(p[0][0])},${f1(p[0][1])}`;
+  for(let k=1;k<p.length-1;k++){
+    const a=p[k-1],b=p[k],c=p[k+1];
+    const l1=Math.hypot(b[0]-a[0],b[1]-a[1]),l2=Math.hypot(c[0]-b[0],c[1]-b[1]);
+    const rr=Math.min(r,l1/2,l2/2);
+    d+=` L${f1(b[0]+(a[0]-b[0])*rr/l1)},${f1(b[1]+(a[1]-b[1])*rr/l1)} Q${f1(b[0])},${f1(b[1])} ${f1(b[0]+(c[0]-b[0])*rr/l2)},${f1(b[1]+(c[1]-b[1])*rr/l2)}`;
+  }
+  const z=p[p.length-1]; return d+` L${f1(z[0])},${f1(z[1])}`;
+}
+function inset(poly,k){const cx=poly.reduce((a,p)=>a+p[0],0)/4,cy=poly.reduce((a,p)=>a+p[1],0)/4;
+  return poly.map(([x,y])=>{const dx=cx-x,dy=cy-y,l=Math.hypot(dx,dy);return [f1(x+dx*k/l),f1(y+dy*k/l)]}).join(" ")}
+
+const parks=new Set(["2,3","3,3","8,4","3,11","9,10","10,13","5,1","7,12","1,14"]);
+let s=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pinigėnų miesto žemėlapis su autobusų maršrutais">`;
+s+=`<rect width="${W}" height="${H}" fill="var(--land)"/>`;
+for(let j=0;j<RW;j++)for(let i=0;i<C;i++){
+  const poly=[N[j][i],N[j][i+1],N[j+1][i+1],N[j+1][i]];
+  s+=`<polygon points="${inset(poly,5)}" fill="var(${parks.has(i+","+j)?"--park":"--block"})"/>`;
+}
+const river="M-20,195 C105,155 180,325 280,322 S430,415 540,485";
+s+=`<path id="river" d="${river}" fill="none" stroke="var(--water)" stroke-width="22" stroke-linecap="round"/>`;
+s+=`<text font-family="IBM Plex Sans,sans-serif" font-size="9" font-style="italic" fill="var(--maplabel)" letter-spacing="2"><textPath href="#river" startOffset="64%">Vingė</textPath></text>`;
+let cas="",str="";
+for(const e of E){
+  const [i,j]=e.slice(1).split(",").map(Number);
+  const a=N[j][i], b=e[0]==="h"?N[j][i+1]:N[j+1][i];
+  const av=(e[0]==="h"&&j===AV_ROW)||(e[0]==="v"&&i===AV_COL);
+  const ln=`x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(b[0])}" y2="${f1(b[1])}"`;
+  cas+=`<line ${ln} stroke-width="${av?10:6.5}"/>`; str+=`<line ${ln} stroke-width="${av?7:4}"/>`;
+}
+s+=`<g stroke="var(--casing)" stroke-linecap="round">${cas}</g><g stroke="var(--street)" stroke-linecap="round">${str}</g>`;
+const DIST=[["Ąžuolynė",1,1],["Malūnėliai",8,1],["Kalnėnai",10,4],["Senamiestis",5,6],["Pakrantė",9,8],["Liepynė",1,8],["Naujakuriai",5,11],["Beržynai",2,13],["Stoties kvartalas",9,13]];
+const halo=`paint-order="stroke" stroke="var(--land)" stroke-width="3" stroke-linejoin="round"`;
+for(const [nm,i,j] of DIST){const a=N[j][i],b=N[j+1][i+1];
+  s+=`<text x="${f1((a[0]+b[0])/2)}" y="${f1((a[1]+b[1])/2+3)}" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="8.5" font-weight="600" letter-spacing="1.2" fill="var(--maplabel)" ${halo}>${nm.toUpperCase()}</text>`;}
+
+const keyXY={};
+let rc="",rl="",stops="";
+ROUTES.forEach((r,k)=>{
+  const o=OFF[k];
+  const pts=r.nodes.map(([i,j])=>{const p=N[j][i];return r.h?[p[0],p[1]+o]:[p[0]+o,p[1]]});
+  const d=rpath(pts,12);
+  rc+=`<path d="${d}" stroke-width="8"/>`;
+  rl+=`<path d="${d}" stroke="var(${r.c})" stroke-width="4.8"/>`;
+  r.pts=pts;r.stops=[];
+  r.sq.forEach((q,si)=>{
+    const kk=r.skeys[si],nm=nameK(kk);r.stops.push(nm);
+    const p=pts[q],x=Math.min(W-8,Math.max(8,p[0])),y=Math.min(H-8,Math.max(8,p[1]));
+    keyXY[kk]??=[x,y];
+    const big=q===0||q===pts.length-1||cnt[kk]>1;
+    stops+=`<g class="sdot" data-x="${f1(x)}" data-y="${f1(y)}" data-n="${nm}" data-c="${r.c}"><circle cx="${f1(x)}" cy="${f1(y)}" r="9" fill="transparent"/><circle class="vis" cx="${f1(x)}" cy="${f1(y)}" r="${big?3.4:2.7}" fill="var(--street)" stroke="var(${r.c})" stroke-width="1.8"/></g>`;
+  });
+});
+s+=`<g fill="none" stroke="var(--street)" stroke-linecap="round" stroke-linejoin="round">${rc}</g>`;
+s+=`<g id="routelines" fill="none" stroke-linecap="round" stroke-linejoin="round">${rl}</g>`;
+s+=`<g id="leglines" fill="none" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"></g>${stops}<g id="legdots" pointer-events="none"></g>`;
+s+=`<g transform="translate(${W-30},34)"><circle r="13" fill="var(--street)" stroke="var(--casing)"/><path d="M0,-9 L5,5 L0,2 L-5,5Z" fill="var(--maplabel)"/><text y="-15" text-anchor="middle" font-family="Archivo,Arial,sans-serif" font-weight="700" font-size="9" fill="var(--maplabel)" ${halo}>Š</text></g>`;
+s+=`<g transform="translate(16,${H-16})" font-family="IBM Plex Sans,sans-serif" font-size="8" fill="var(--maplabel)"><rect x="-4" y="-16" width="56" height="20" rx="4" fill="var(--street)" opacity=".85"/><path d="M2,-4 V0 H42 V-4" fill="none" stroke="var(--maplabel)" stroke-width="1.4"/><text x="22" y="-7" text-anchor="middle">500 m</text></g>`;
+s+=`<g id="taskmarks" pointer-events="none"></g>`;
+s+=`<g id="tip" hidden pointer-events="none"><rect rx="5" fill="var(--fg)"/><text font-family="IBM Plex Sans,sans-serif" font-size="11" font-weight="600" fill="var(--bg)"></text></g></svg>`;
+document.getElementById("mapbox").innerHTML=s;
+
+const tip=document.getElementById("tip");
+document.getElementById("mapbox").addEventListener("click",e=>{
+  const g=e.target.closest(".sdot");
+  if(!g){tip.setAttribute("hidden","");return}
+  const x=+g.dataset.x,y=+g.dataset.y,t=tip.querySelector("text"),rct=tip.querySelector("rect");
+  t.textContent=g.dataset.n;tip.removeAttribute("hidden");
+  const w=t.getComputedTextLength()+16,hgt=22;
+  let bx=Math.min(W-w-4,Math.max(4,x-w/2)),by=y-hgt-8;if(by<4)by=y+10;
+  rct.setAttribute("x",bx);rct.setAttribute("y",by);rct.setAttribute("width",w);rct.setAttribute("height",hgt);
+  rct.setAttribute("stroke",`var(${g.dataset.c})`);rct.setAttribute("stroke-width","2");
+  t.setAttribute("x",bx+8);t.setAttribute("y",by+15);
+});
+
+/* ---------- Game state ---------- */
+const pad=n=>String(n).padStart(2,"0");
+const fmt=m=>pad(Math.floor(m/60))+":"+pad(m%60);
+let ti=0, LEGS=[], FB=null, TOAST=null, CHOSEN=8*60;
+const st={bus:null,stop:null};
+const V=document.getElementById("viewRes");
+const BUSICON=`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="15" rx="3" fill="#fff"/><rect x="6" y="5.5" width="12" height="6" rx="1" fill="currentColor"/><circle cx="8" cy="15" r="1.3" fill="currentColor"/><circle cx="16" cy="15" r="1.3" fill="currentColor"/><rect x="6" y="18" width="3" height="3" rx="1" fill="#fff"/><rect x="15" y="18" width="3" height="3" rx="1" fill="#fff"/></svg>`;
+const busBox=b=>`<span class="bus" style="background:var(${b.c});color:var(${b.c})">${BUSICON}</span>`;
+const legKey=l=>ROUTES[l.bus].skeys[l.stop];
+const legName=l=>BUSES[l.bus].stops[l.stop];
+BUSES.forEach(b=>b.stops=ROUTES[b.r].stops);
+const lc=s=>s.charAt(0).toLowerCase()+s.slice(1);
+
+function drawTaskMarks(){
+  const g=document.getElementById("taskmarks"),T=TASKS[ti];
+  if(!T){g.innerHTML="";return}
+  const [ax,ay]=keyXY[T.a],[bx,by]=keyXY[T.b];
+  g.innerHTML=`<circle class="blip" cx="${ax}" cy="${ay}" r="9" fill="none" stroke="var(--fg)" stroke-width="2"/>
+    <circle cx="${ax}" cy="${ay}" r="6" fill="var(--street)" stroke="var(--fg)" stroke-width="3"/>
+    <circle class="blip" cx="${bx}" cy="${by}" r="9" fill="none" stroke="var(--fg)" stroke-width="2"/>
+    <circle cx="${bx}" cy="${by}" r="7" fill="var(--fg)"/><circle cx="${bx}" cy="${by}" r="2.6" fill="var(--street)"/>`;
+}
+
+function drawLegs(){
+  const gl=document.getElementById("leglines"),gd=document.getElementById("legdots"),T=TASKS[ti];
+  document.getElementById("routelines").style.opacity=(T&&LEGS.length)?".4":"";
+  if(!T||!LEGS.length){gl.innerHTML="";gd.innerHTML="";return}
+  let h="",d="";
+  LEGS.forEach((l,i)=>{
+    const r=ROUTES[l.bus],target=i<LEGS.length-1?legKey(LEGS[i+1]):T.b;
+    let j=r.pos[target];const ok=j!==undefined&&j>l.stop;
+    if(!ok)j=r.skeys.length-1;
+    const seg=r.pts.slice(r.sq[l.stop],r.sq[j]+1);
+    if(seg.length>1){const pd=rpath(seg,12);
+      h+=`<path d="${pd}" stroke="var(--fg)" stroke-opacity=".2" stroke-width="15"/><path d="${pd}" stroke="var(${r.c})" stroke-width="7"${ok?"":` stroke-dasharray="1 11"`}/>`;}
+    const [x,y]=r.pts[r.sq[l.stop]];
+    d+=`<circle cx="${f1(x)}" cy="${f1(y)}" r="9" fill="var(${r.c})" stroke="var(--street)" stroke-width="2.2"/><text x="${f1(x)}" y="${f1(y+4)}" text-anchor="middle" font-family="Archivo,Arial,sans-serif" font-weight="800" font-size="11" fill="${BUSES[l.bus].fg}">${i+1}</text>`;
+  });
+  gl.innerHTML=h;gd.innerHTML=d;
+}
+
+function slotsHTML(){
+  return [0,1,2].map(i=>{const l=LEGS[i];
+    const cell=l?`<button class="slot full" data-rm="${i}" style="--rc:var(${BUSES[l.bus].c});--rc-fg:${BUSES[l.bus].fg}" aria-label="Pašalinti: ${BUSES[l.bus].name} autobusas, ${legName(l)}, ${fmt(l.time)}"><span class="x">×</span><span class="stime">${fmt(l.time)}${isAcc(BUSES[l.bus],l.stop,l.time)?WC:""}</span><span class="sstop">${legName(l)}</span></button>`
+                :`<div class="slot"><span class="snum">${i+1}</span></div>`;
+    return (i?`<span class="plus">+</span>`:"")+cell}).join("");
+}
+
+function renderMap(){
+  const T=TASKS[ti];
+  const taskEl=document.getElementById("task");
+  if(!T){
+    taskEl.innerHTML=`<div class="task"><div class="label">Visos užduotys atliktos</div><div class="trip">Puiku! Visos ${TASKS.length} kelionės suplanuotos.</div></div>`;
+    document.getElementById("slots").innerHTML="";document.getElementById("hint").hidden=true;
+    document.getElementById("fb").innerHTML=`<div class="fb ok"><button class="go small" data-restart>Pradėti iš naujo</button></div>`;
+    document.getElementById("go").hidden=true;document.getElementById("check").hidden=true;
+    drawTaskMarks();drawLegs();return;
+  }
+  document.getElementById("hint").hidden=false;document.getElementById("go").hidden=false;document.getElementById("check").hidden=false;
+  taskEl.innerHTML=`<div class="task"><div class="label">Užduotis ${ti+1} iš ${TASKS.length}</div>
+    <div class="trip">${nameK(T.a)}<span class="arrow">→</span>${nameK(T.b)}</div>
+    <div class="meta">Stotelėje esate <b>${fmt(T.T0)}</b>. Atvykti reikia iki <b>${fmt(T.deadline)}</b>. Kelionė trimis skirtingais autobusais.</div></div>`;
+  document.getElementById("slots").innerHTML=slotsHTML();
+  document.getElementById("check").disabled=LEGS.length<3;
+  document.getElementById("fb").innerHTML=FB?(FB.ok
+    ?`<div class="fb ok"><strong>Teisingai!</strong><span>${FB.msg}</span><button class="go small" data-next>${ti+1<TASKS.length?"Kita užduotis →":"Baigti"}</button></div>`
+    :`<div class="fb err"><strong>Dar ne visai.</strong><span>${FB.msg}</span></div>`):"";
+  drawTaskMarks();drawLegs();
+}
+
+function check(){
+  const T=TASKS[ti],L=LEGS,nm=nameK;
+  const res=(ok,msg)=>{FB={ok,msg:msg.replace(/\.\.$/,".")};return ok};
+  if(new Set(L.map(l=>l.bus)).size<3)return res(false,"Naudokite tris skirtingus autobusus.");
+  if(legKey(L[0])!==T.a)return res(false,`Kelionė prasideda stotelėje ${nm(T.a)}, o pirmasis autobusas pasirinktas stotelėje ${legName(L[0])}.`);
+  if(L[0].time<T.T0)return res(false,`Į stotelę ${nm(T.a)} ateinate ${fmt(T.T0)}, o pasirinktas autobusas išvyksta anksčiau, ${fmt(L[0].time)}.`);
+  for(let i=0;i<3;i++){
+    const b=BUSES[L[i].bus],Rr=ROUTES[L[i].bus];
+    const toKey=i<2?legKey(L[i+1]):T.b, j=Rr.pos[toKey];
+    if(j===undefined||j<=L[i].stop)return res(false,i<2
+      ?`${b.name} autobusas iš stotelės ${legName(L[i])} nenuvažiuoja iki stotelės ${nm(toKey)}, kurioje norite persėsti.`
+      :`${b.name} autobusas iš stotelės ${legName(L[i])} nenuveža iki stotelės ${nm(T.b)}.`);
+    const arr=L[i].time+b.off[j]-b.off[L[i].stop];
+    if(i<2&&L[i+1].time<arr)return res(false,`Nespėsite persėsti stotelėje ${nm(toKey)}: ten atvyksite ${fmt(arr)}, o ${lc(BUSES[L[i+1].bus].name)} autobusas išvyksta ${fmt(L[i+1].time)}.`);
+    if(i===2){
+      if(arr>T.deadline)return res(false,`Į stotelę ${nm(T.b)} atvyksite ${fmt(arr)}. Tai per vėlu: reikia atvykti iki ${fmt(T.deadline)}.`);
+      return res(true,`Į stotelę ${nm(T.b)} atvyksite ${fmt(arr)}, laiku.`);
+    }
+  }
+}
+
+function addLeg(bus,stop,time){
+  if(LEGS.some(l=>l.bus===bus&&l.stop===stop&&l.time===time)){TOAST={warn:true,msg:"Šis reisas jau pridėtas."};return}
+  if(LEGS.length>=3){TOAST={warn:true,msg:"Visi trys laukeliai užpildyti. Pašalinkite vieną, jei norite pakeisti."};return}
+  LEGS.push({bus,stop,time});FB=null;
+  TOAST={msg:`Pridėta į ${LEGS.length} laukelį: ${lc(BUSES[bus].name)} autobusas, ${BUSES[bus].stops[stop]}, ${fmt(time)}.`};
+}
+
+/* ---------- Schedule views ---------- */
+const picker=()=>`<div class="picker"><label for="ph" class="label">Laikas</label>
+  <select id="ph">${Array.from({length:15},(_,i)=>8+i).map(h=>`<option value="${h}"${Math.floor(CHOSEN/60)===h?" selected":""}>${pad(h)}</option>`).join("")}</select>
+  <span class="colon">:</span>
+  <select id="pm">${Array.from({length:12},(_,i)=>i*5).map(m=>`<option value="${m}"${CHOSEN%60===m?" selected":""}>${pad(m)}</option>`).join("")}</select></div>`;
+function inTxt(m){const d=m-CHOSEN;return d<=0?"tuo metu":d<60?`po ${d} min.`:`po ${Math.floor(d/60)} val. ${d%60} min.`}
+function tray(){const T=TASKS[ti];
+  return `<div class="tray"><div class="label">${nameK(T.a)} → ${nameK(T.b)} · iki ${fmt(T.deadline)}</div>
+    <div class="slots">${slotsHTML()}</div>
+    ${TOAST?`<div class="toast${TOAST.warn?" warn":""}" role="status">${TOAST.msg}</div>`:""}
+    ${LEGS.length===3?`<button class="go small" data-check>Tikrinti</button>`:""}</div>`}
+function busRow(k){const b=BUSES[k],nx=firstDep(b,0,CHOSEN);
+  return `<button class="row" data-bus="${k}">${busBox(b)}
+    <span class="info"><span class="bname">${b.name}</span><span class="rname">${b.stops[0]} – ${b.stops[b.stops.length-1]}</span>
+    <span class="top">${nx!==undefined?`<span class="big">${fmt(nx)}</span>${isAcc(b,0,nx)?WC:""}<span class="in">išvyksta ${inTxt(nx)}</span>`:`<span class="in">Šiandien reisų nebėra</span>`}</span></span></button>`}
+
+function render(){
+  const T=TASKS[ti];
+  if(st.bus===null){
+    V.innerHTML=`<button class="back" data-go="map">← Žemėlapis</button>${tray()}${picker()}
+    <header><h1>Maršrutai</h1><p>Pinigėnai · 8:00–22:00</p></header>
+    <div class="list">${BUSES.map((b,k)=>busRow(k)).join("")}</div>
+    <div class="legend">${WC}<span>reisas pritaikytas žmonėms su vežimėliu</span></div>
+    <p class="note">Pasirinkite autobusą, kad pamatytumėte jo stoteles.</p>`;
+  } else if(st.stop===null){
+    const b=BUSES[st.bus],Rr=ROUTES[st.bus];
+    V.innerHTML=`<button class="back" data-go="list">← Maršrutai</button>${tray()}${picker()}
+    <div class="rhead">${busBox(b)}<header><div class="bname">${b.name} autobusas</div><h1>${b.stops[0]} – ${b.stops[b.stops.length-1]}</h1></header></div>
+    <div class="label">Stotelės</div>
+    <div class="stops" style="--rc:var(${b.c})">${b.stops.map((sn,k)=>{const kk=Rr.skeys[k],nx=firstDep(b,k,CHOSEN);
+      const others=BUSES.filter((o,oi)=>oi!==st.bus&&ROUTES[oi].pos[kk]!==undefined);
+      const tag=kk===T.a?`<span class="tag">Pradžia</span>`:kk===T.b?`<span class="tag">Tikslas</span>`:"";
+      return `<button class="stop" data-stop="${k}"><span class="dot"></span><span class="sn">${sn}${others.length?`<span class="xfer" title="Persėdimas">${others.map(o=>`<i style="background:var(${o.c})" title="${o.name}"></i>`).join("")}</span>`:""}${tag}</span><span class="snx">${nx!==undefined?fmt(nx):"—"}</span></button>`}).join("")}</div>
+    <p class="note">Spalvoti kvadratėliai rodo, kurie kiti autobusai sustoja toje stotelėje. Pasirinkite stotelę, kad pamatytumėte laikus.</p>`;
+  } else {
+    const b=BUSES[st.bus],k=st.stop,list=timesAt(b,k),up=list.filter(m=>m>=CHOSEN),nx=up[0];
+    const isPicked=m=>LEGS.some(l=>l.bus===st.bus&&l.stop===k&&l.time===m);
+    const byH={};list.forEach(m=>{(byH[Math.floor(m/60)]??=[]).push(m)});
+    V.innerHTML=`<button class="back" data-go="stops">← Stotelės</button>${tray()}${picker()}
+    <div class="rhead">${busBox(b)}<header><div class="bname">${b.name} autobusas</div><h1>${b.stops[k]}</h1><p>Kryptis: ${b.stops[b.stops.length-1]}</p></header></div>
+    <div style="--rc:var(${b.c});--rc-fg:${b.fg};display:flex;flex-direction:column;gap:16px">
+      <div><div class="label" style="margin-bottom:8px">Artimiausi išvykimai</div>
+      <div class="upcoming">${up.length?up.slice(0,4).map((m,i)=>`<button class="tbtn chip${i?"":" first"}${isPicked(m)?" picked":""}" data-time="${m}">${fmt(m)}${isAcc(b,k,m)?WC:""}${i?"":`<small>${inTxt(m)}</small>`}</button>`).join(""):`<span class="chip">Šiandien reisų nebėra</span>`}</div></div>
+      <div><div class="label" style="margin-bottom:8px">Visas dienos tvarkaraštis</div>
+      <div class="grid">${Object.keys(byH).map(h=>`<div class="hr"><div class="h">${pad(h)}</div><div class="ms">${byH[h].map(m=>`<button class="tbtn${m===nx?" nx":m<CHOSEN?" past":""}${isPicked(m)?" picked":""}" data-time="${m}" aria-label="${fmt(m)}${isAcc(b,k,m)?", pritaikyta žmonėms su vežimėliu":""}">${pad(m%60)}${isAcc(b,k,m)?WC:""}</button>`).join("")}</div></div>`).join("")}</div></div>
+    </div>
+    <div class="legend">${WC}<span>reisas pritaikytas žmonėms su vežimėliu</span></div>
+    <p class="note">Bakstelėkite laiką, kad įtrauktumėte šį reisą į savo kelionę.</p>`;
+  }
+}
+V.addEventListener("click",e=>{
+  const t=e.target.closest("[data-go],[data-bus],[data-stop],[data-time],[data-rm],[data-check]");if(!t)return;
+  const keepScroll=t.dataset.time!==undefined||t.dataset.rm!==undefined;
+  if(t.dataset.check!==undefined){check();show(false);setTimeout(()=>document.getElementById("fb").scrollIntoView({block:"center"}),0);return}
+  if(t.dataset.go==="map"){show(false);return}
+  if(t.dataset.time!==undefined){addLeg(st.bus,st.stop,+t.dataset.time);render();return}
+  if(t.dataset.rm!==undefined){LEGS.splice(+t.dataset.rm,1);FB=null;TOAST=null;render();return}
+  TOAST=null;
+  if(t.dataset.go==="list"){st.bus=null;st.stop=null}
+  else if(t.dataset.go==="stops"){st.stop=null}
+  else if(t.dataset.bus!==undefined){st.bus=+t.dataset.bus;st.stop=null}
+  else if(t.dataset.stop!==undefined){st.stop=+t.dataset.stop}
+  render();if(!keepScroll)window.scrollTo(0,0);
+});
+V.addEventListener("change",e=>{
+  if(e.target.id!=="ph"&&e.target.id!=="pm")return;
+  CHOSEN=Math.min(22*60,(+document.getElementById("ph").value)*60+(+document.getElementById("pm").value));
+  render();
+});
+function show(res){
+  document.getElementById("viewMap").hidden=res;V.hidden=!res;window.scrollTo(0,0);
+  if(res){TOAST=null;render()}else renderMap();
+}
+function startTask(i){ti=i;LEGS=[];FB=null;TOAST=null;st.bus=null;st.stop=null;if(TASKS[ti])CHOSEN=Math.floor(TASKS[ti].T0/5)*5;renderMap()}
+document.getElementById("go").addEventListener("click",()=>show(true));
+document.getElementById("check").addEventListener("click",()=>{check();renderMap()});
+document.getElementById("viewMap").addEventListener("click",e=>{
+  const rm=e.target.closest("[data-rm]");if(rm){LEGS.splice(+rm.dataset.rm,1);FB=null;renderMap();return}
+  if(e.target.closest("[data-next]")){startTask(ti+1);window.scrollTo(0,0);return}
+  if(e.target.closest("[data-restart]")){startTask(0);window.scrollTo(0,0)}
+});
+startTask(0);
+</script>
+
+</body>
+</html>
