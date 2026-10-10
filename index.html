@@ -177,7 +177,7 @@ header p{margin:2px 0 0;color:var(--muted)}
   <div class="mapbox" id="mapbox"></div>
   <div class="label" style="text-align:center">Jūsų kelionė</div>
   <div class="slots" id="slots"></div>
-  <p class="hint" id="hint">Spauskite „Ieškoti“, pasirinkite autobusą ir stotelę, tada bakstelėkite išvykimo laiką. Jis atsiras laukelyje, o kelionė bus nupiešta žemėlapyje.</p>
+  <p class="hint" id="hint">Spauskite „Ieškoti“, pasirinkite autobusą ir stotelę, tada bakstelėkite išvykimo laiką. Jis atsiras laukelyje, o kelionė bus nupiešta žemėlapyje. Bakstelėkite stotelę ant nušviestos linijos, kad pamatytumėte, kada autobusas ten bus.</p>
   <div id="fb"></div>
   <div class="btns">
     <button class="go" id="go">Ieškoti</button>
@@ -379,7 +379,7 @@ ROUTES.forEach((r,k)=>{
     const p=pts[q],x=Math.min(W-8,Math.max(8,p[0])),y=Math.min(H-8,Math.max(8,p[1]));
     keyXY[kk]??=[x,y];
     const big=q===0||q===pts.length-1||cnt[kk]>1;
-    stops+=`<g class="sdot" data-x="${f1(x)}" data-y="${f1(y)}" data-n="${nm}" data-c="${r.c}"><circle cx="${f1(x)}" cy="${f1(y)}" r="9" fill="transparent"/><circle class="vis" cx="${f1(x)}" cy="${f1(y)}" r="${big?3.4:2.7}" fill="var(--street)" stroke="var(${r.c})" stroke-width="1.8"/></g>`;
+    stops+=`<g class="sdot" data-k="${kk}" data-x="${f1(x)}" data-y="${f1(y)}" data-n="${nm}" data-c="${r.c}"><circle cx="${f1(x)}" cy="${f1(y)}" r="9" fill="transparent"/><circle class="vis" cx="${f1(x)}" cy="${f1(y)}" r="${big?3.4:2.7}" fill="var(--street)" stroke="var(${r.c})" stroke-width="1.8"/></g>`;
   });
 });
 s+=`<g fill="none" stroke="var(--street)" stroke-linecap="round" stroke-linejoin="round">${rc}</g>`;
@@ -394,7 +394,8 @@ document.getElementById("mapbox").innerHTML=s;
 const tip=document.getElementById("tip");
 document.getElementById("mapbox").addEventListener("click",e=>{
   const g=e.target.closest(".sdot");
-  if(!g){tip.setAttribute("hidden","");return}
+  if(!g){tip.setAttribute("hidden","");document.getElementById("leglabels").innerHTML="";return}
+  if(LEGINFO[g.dataset.k]){tip.setAttribute("hidden","");toggleLabel(g.dataset.k);return}
   const x=+g.dataset.x,y=+g.dataset.y,t=tip.querySelector("text"),rct=tip.querySelector("rect");
   t.textContent=g.dataset.n;tip.removeAttribute("hidden");
   const w=t.getComputedTextLength()+16,hgt=22;
@@ -427,12 +428,36 @@ function drawTaskMarks(){
     <circle cx="${bx}" cy="${by}" r="7" fill="var(--fg)"/><circle cx="${bx}" cy="${by}" r="2.6" fill="var(--street)"/>`;
 }
 
+let LEGINFO={};
+const LBLICO=`<g transform="scale(.5)"><rect x="1" y="2" width="18" height="14" rx="3" fill="currentColor"/><rect x="3.5" y="4.5" width="13" height="5" rx="1" fill="var(--surface)"/><circle cx="6" cy="17" r="2.2" fill="currentColor"/><circle cx="14" cy="17" r="2.2" fill="currentColor"/><path d="M21 9h5m-2.5-2.5L26 9l-2.5 2.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+function toggleLabel(key){
+  const glb=document.getElementById("leglabels"),ex=glb.querySelector(`[data-k="${key}"]`);
+  if(ex){ex.remove();return}
+  const L=LEGINFO[key],NS="http://www.w3.org/2000/svg",g=document.createElementNS(NS,"g");
+  g.setAttribute("data-k",key);g.style.color=`var(${L.c})`;
+  g.innerHTML=`<rect rx="5" fill="var(--surface)" stroke="currentColor" stroke-width="1.6"/><g class="ico">${LBLICO}</g><text class="nm lbl" font-family="IBM Plex Sans,sans-serif" font-size="10" font-weight="600" fill="var(--fg)"><tspan font-weight="800">${L.dep?"išvyksta ":""}${fmt(L.t)}</tspan> ${L.n}</text>`;
+  glb.appendChild(g);
+  const t=g.querySelector("text"),w=t.getComputedTextLength()+28,hh=17;
+  const placed=[...glb.querySelectorAll(":scope>g")].filter(x=>x!==g&&x.dataset.box).map(x=>x.dataset.box.split(",").map(Number));
+  const cands=[];for(const dy of [-hh-6,6,-2*hh-10,hh+12,-3*hh-14,2*hh+18])for(const dx of [7,-w-7,-w/2])cands.push([dx,dy]);
+  let best=null;
+  for(const [dx,dy] of cands){const bx=Math.min(W-w-3,Math.max(3,L.x+dx)),by=Math.min(H-hh-3,Math.max(3,L.y+dy));
+    const hit=placed.some(p=>bx<p[0]+p[2]+2&&bx+w+2>p[0]&&by<p[1]+p[3]+2&&by+hh+2>p[1]);
+    if(!hit){best=[bx,by];break}if(!best)best=[bx,by]}
+  g.dataset.box=[best[0],best[1],w,hh].join(",");
+  const cx=Math.max(best[0],Math.min(L.x,best[0]+w)),cy=Math.max(best[1],Math.min(L.y,best[1]+hh));
+  if(Math.hypot(cx-L.x,cy-L.y)>14){const ln=document.createElementNS(NS,"line");
+    ln.setAttribute("x1",L.x);ln.setAttribute("y1",L.y);ln.setAttribute("x2",cx);ln.setAttribute("y2",cy);ln.setAttribute("stroke","currentColor");ln.setAttribute("stroke-width","1.4");g.prepend(ln)}
+  const r=g.querySelector("rect");r.setAttribute("x",best[0]);r.setAttribute("y",best[1]);r.setAttribute("width",w);r.setAttribute("height",hh);
+  g.querySelector(".ico").setAttribute("transform",`translate(${best[0]+4},${best[1]+3})`);
+  t.setAttribute("x",best[0]+20);t.setAttribute("y",best[1]+12);
+}
 function drawLegs(){
   const gl=document.getElementById("leglines"),gd=document.getElementById("legdots"),T=TASKS[ti];
   document.getElementById("routelines").style.opacity=(T&&LEGS.length)?".4":"";
   const glb=document.getElementById("leglabels");
-  if(!T||!LEGS.length){gl.innerHTML="";gd.innerHTML="";glb.innerHTML="";return}
-  let h="",d="";const labels=[];
+  if(!T||!LEGS.length){gl.innerHTML="";gd.innerHTML="";glb.innerHTML="";LEGINFO={};return}
+  let h="",d="";LEGINFO={};
   LEGS.forEach((l,i)=>{
     const r=ROUTES[l.bus],target=i<LEGS.length-1?legKey(LEGS[i+1]):T.b;
     let j=r.pos[target];const ok=j!==undefined&&j>l.stop;
@@ -440,33 +465,15 @@ function drawLegs(){
     const seg=r.pts.slice(r.sq[l.stop],r.sq[j]+1);
     if(seg.length>1){const pd=rpath(seg,12);
       h+=`<path d="${pd}" stroke="var(--fg)" stroke-opacity=".2" stroke-width="15"/><path d="${pd}" stroke="var(${r.c})" stroke-width="7"${ok?"":` stroke-dasharray="1 11"`}/>`;}
-    /* arrival-time labels: change stops along the newest ride, the transfer stop on earlier rides */
-    const B=BUSES[l.bus],lastLeg=i===LEGS.length-1;
-    for(let k=l.stop+1;k<=j;k++){const kk=r.skeys[k],arr=l.time+B.off[k]-B.off[l.stop];
-      if(arr>22*60)break;
-      const xfer=BUSES.some((o,oi)=>oi!==l.bus&&ROUTES[oi].pos[kk]!==undefined),target=ok&&k===j;
-      if(lastLeg?(xfer||target):target){const [px,py]=r.pts[r.sq[k]];labels.push({x:px,y:py,t:arr,n:B.stops[k],c:r.c,dest:kk===T.b})}}
+    /* remember when this bus is at every stop of the lit ride (shown when a dot is tapped) */
+    const B=BUSES[l.bus];
+    for(let k=l.stop;k<=j;k++){const kk=r.skeys[k],tm=l.time+B.off[k]-B.off[l.stop];
+      if(tm>22*60)break;if(LEGINFO[kk])continue;
+      const [px,py]=r.pts[r.sq[k]];LEGINFO[kk]={x:px,y:py,t:tm,n:B.stops[k],c:r.c,dep:k===l.stop}}
     const [x,y]=r.pts[r.sq[l.stop]];
     d+=`<circle cx="${f1(x)}" cy="${f1(y)}" r="9" fill="var(${r.c})" stroke="var(--street)" stroke-width="2.2"/><text x="${f1(x)}" y="${f1(y+4)}" text-anchor="middle" font-family="Archivo,Arial,sans-serif" font-weight="800" font-size="11" style="fill:${BUSES[l.bus].fg}">${i+1}</text>`;
   });
-  gl.innerHTML=h;gd.innerHTML=d;
-  const ICO=`<g transform="scale(.5)"><rect x="1" y="2" width="18" height="14" rx="3" fill="currentColor"/><rect x="3.5" y="4.5" width="13" height="5" rx="1" fill="var(--surface)"/><circle cx="6" cy="17" r="2.2" fill="currentColor"/><circle cx="14" cy="17" r="2.2" fill="currentColor"/><path d="M21 9h5m-2.5-2.5L26 9l-2.5 2.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>`;
-  glb.innerHTML=labels.map(L=>`<g style="color:var(${L.c})"><rect rx="5" fill="var(--surface)" stroke="currentColor" stroke-width="1.6"/><g class="ico">${ICO}</g><text class="nm lbl" font-family="IBM Plex Sans,sans-serif" font-size="10" font-weight="600" fill="var(--fg)"><tspan font-weight="800">${fmt(L.t)}</tspan> ${L.n}</text></g>`).join("");
-  const placed=[];
-  glb.querySelectorAll(":scope>g").forEach((g,ix)=>{const L=labels[ix],t=g.querySelector("text"),w=t.getComputedTextLength()+28,hh=17;
-    const cands=[];for(const dy of [-hh-6,6,-2*hh-10,hh+12,-3*hh-14,2*hh+18,-4*hh-18,3*hh+24])for(const dx of [7,-w-7,-w/2])cands.push([dx,dy]);
-    let best=null;
-    for(const [dx,dy] of cands){const bx=Math.min(W-w-3,Math.max(3,L.x+dx)),by=Math.min(H-hh-3,Math.max(3,L.y+dy));
-      const hit=placed.some(p=>bx<p[0]+p[2]+2&&bx+w+2>p[0]&&by<p[1]+p[3]+2&&by+hh+2>p[1]);
-      if(!hit){best=[bx,by];break}if(!best)best=[bx,by]}
-    placed.push([best[0],best[1],w,hh]);
-    const cx=Math.max(best[0],Math.min(L.x,best[0]+w)),cy=Math.max(best[1],Math.min(L.y,best[1]+hh));
-    if(Math.hypot(cx-L.x,cy-L.y)>14){const ln=document.createElementNS("http://www.w3.org/2000/svg","line");
-      ln.setAttribute("x1",L.x);ln.setAttribute("y1",L.y);ln.setAttribute("x2",cx);ln.setAttribute("y2",cy);ln.setAttribute("stroke","currentColor");ln.setAttribute("stroke-width","1.4");g.prepend(ln)}
-    const r=g.querySelector("rect");r.setAttribute("x",best[0]);r.setAttribute("y",best[1]);r.setAttribute("width",w);r.setAttribute("height",hh);
-    g.querySelector(".ico").setAttribute("transform",`translate(${best[0]+4},${best[1]+3})`);
-    t.setAttribute("x",best[0]+20);t.setAttribute("y",best[1]+12);
-  });
+  gl.innerHTML=h;gd.innerHTML=d;glb.innerHTML="";
 }
 
 function slotsHTML(){
