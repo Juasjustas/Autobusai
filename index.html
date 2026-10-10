@@ -380,11 +380,11 @@ function rpath(p,r){
   }
   const z=p[p.length-1]; return d+` L${f1(z[0])},${f1(z[1])}`;
 }
-/* direction arrows along a polyline: every ~110 px and at the very end */
+/* direction arrows: one near the end of the line, plus one in the middle on longer lines */
 function arrowsFor(P,color,size=1){
   const seg=[];let tot=0;for(let i=1;i<P.length;i++){const l=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);seg.push(l);tot+=l}
   if(tot<30)return "";
-  const at=[];for(let d=70;d<tot-45;d+=110)at.push(d);at.push(tot-20);
+  const at=tot>220?[tot*.5,tot-20]:[tot-20];
   return at.map(d=>{let i=0,acc=0;while(i<seg.length-1&&acc+seg[i]<d){acc+=seg[i];i++}
     const t=seg[i]?(d-acc)/seg[i]:0,a=P[i],b=P[i+1],x=a[0]+(b[0]-a[0])*t,y=a[1]+(b[1]-a[1])*t,ang=Math.atan2(b[1]-a[1],b[0]-a[0])*180/Math.PI;
     return `<path d="M${5*size},0 L${-3.5*size},${-4*size} L${-1.5*size},0 L${-3.5*size},${4*size}Z" transform="translate(${f1(x)},${f1(y)}) rotate(${f1(ang)})" fill="var(${color})" stroke="var(--street)" stroke-width=".8" stroke-linejoin="round"/>`}).join("");
