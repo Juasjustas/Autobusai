@@ -396,6 +396,7 @@ document.getElementById("mapbox").addEventListener("click",e=>{
   const g=e.target.closest(".sdot");
   if(!g){tip.setAttribute("hidden","");document.getElementById("leglabels").innerHTML="";return}
   if(LEGINFO[g.dataset.k]){tip.setAttribute("hidden","");toggleLabel(g.dataset.k);return}
+  document.getElementById("leglabels").innerHTML="";
   const x=+g.dataset.x,y=+g.dataset.y,t=tip.querySelector("text"),rct=tip.querySelector("rect");
   t.textContent=g.dataset.n;tip.removeAttribute("hidden");
   const w=t.getComputedTextLength()+16,hgt=22;
@@ -432,7 +433,7 @@ let LEGINFO={};
 const LBLICO=`<g transform="scale(.5)"><rect x="1" y="2" width="18" height="14" rx="3" fill="currentColor"/><rect x="3.5" y="4.5" width="13" height="5" rx="1" fill="var(--surface)"/><circle cx="6" cy="17" r="2.2" fill="currentColor"/><circle cx="14" cy="17" r="2.2" fill="currentColor"/><path d="M21 9h5m-2.5-2.5L26 9l-2.5 2.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>`;
 function toggleLabel(key){
   const glb=document.getElementById("leglabels"),ex=glb.querySelector(`[data-k="${key}"]`);
-  if(ex){ex.remove();return}
+  glb.innerHTML="";if(ex)return;
   const L=LEGINFO[key],NS="http://www.w3.org/2000/svg",g=document.createElementNS(NS,"g");
   g.setAttribute("data-k",key);g.style.color=`var(${L.c})`;
   g.innerHTML=`<rect rx="5" fill="var(--surface)" stroke="currentColor" stroke-width="1.6"/><g class="ico">${LBLICO}</g><text class="nm lbl" font-family="IBM Plex Sans,sans-serif" font-size="10" font-weight="600" fill="var(--fg)"><tspan font-weight="800">${L.dep?"išvyksta ":""}${fmt(L.t)}</tspan> ${L.n}</text>`;
