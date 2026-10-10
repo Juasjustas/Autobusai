@@ -285,6 +285,20 @@ for(const pass of [0,1])for(const [a,b] of cands){
   TASKS.push({a,b,T0,best,deadline:Math.ceil((best.arr+10)/5)*5});usedK.add(a);usedK.add(b);
 }
 
+/* Loosen deadlines so every task has at least two clearly different solutions
+   (different buses, or a different first bus time / arrival), not only another transfer stop */
+function solutions(T,dl){const out=[];
+  for(const ch of chains(T.a,T.b)){const seq=[[ch.A,T.a,ch.t1],[ch.B,ch.t1,ch.t2],[ch.C,ch.t2,T.b]];
+    const rec=(i,t,legs)=>{if(i===3){out.push({legs:legs.slice(),arr:t});return}
+      const [k,fr,to]=seq[i],Rr=ROUTES[k],a=Rr.pos[fr],b=Rr.pos[to],B=BUSES[k];
+      for(const d of timesAt(B,a)){if(d<t)continue;const arr=d+B.off[b]-B.off[a];if(arr>dl)break;legs.push([k,a,d]);rec(i+1,arr,legs);legs.pop()}};
+    rec(0,T.T0,[]);}
+  return out}
+const solSig=x=>x.legs.map(l=>l[0]).join("-")+"@"+x.legs[0][2]+">"+x.arr;
+TASKS.forEach(T=>{let dl=T.deadline;
+  while(new Set(solutions(T,dl).map(solSig)).size<2&&dl<T.deadline+120)dl+=5;
+  T.deadline=dl;});
+
 /* Stop names (first task uses Kopų g. → Varpo g. with a change at Klevų g.) */
 let NAMES=["Turgaus aikštė","Liepų g.","Malūno g.","Vingės krantinė","Rotušės a.","Ąžuolų g.","Mokyklos g.","Ligoninė","Stotis","Kalno g.","Pušyno g.","Bažnyčios g.","Sodų g.","Tilto g.","Universitetas","Parko g.","Jaunimo g.","Biblioteka","Pilies g.","Senoji pirtis","Vilties g.","Beržų g.","Dariaus ir Girėno g.","Žvejų g.","Pinigų kalnelis","Amatų g.","Saulės g.","Poliklinika","Sporto rūmai","Šaltinio g.","Kultūros namai","Vaistinė","Paštas","Lentpjūvės g.","Gėlių g.","Vėjo g.","Muziejus","Rasos g.","Kepyklos g.","Vandentiekio g.","Dvaro g.","Ežero g.","Pievų g.","Statybininkų g.","Kalvių g.","Akacijų g.","Teatras","Naujoji g.","Rūtų g.","Upės g.","Pramonės g.","Miško g.","Aušros g.","Žalioji a.","Kapinių g.","Rinkos g.","Gamyklos g.","Smilgų g.","Tvenkinio g.","Obelų g.","Laisvės pr.","Švyturio g.","Debesų g.","Lakštingalų g.","Kiemelio g.","Gaisrinė","Vienuolyno g.","Pelkių g.","Ramybės g.","Arklių g.","Malūnėlių žiedas","Vyšnių g.","Šilo g.","Girios g.","Uosių g.","Medžiotojų g.","Kaštonų g.","Lygumų g.","Melioratorių g.","Žiedų g.","Kranto g.","Šviesos g.","Pavasario g.","Ūkio g."];
 const NR=rng(5150);for(let i=NAMES.length-1;i>0;i--){const j=Math.floor(NR()*(i+1));[NAMES[i],NAMES[j]]=[NAMES[j],NAMES[i]]}
@@ -494,15 +508,15 @@ function render(){
     <div class="legend">${WC}<span>reisas pritaikytas žmonėms su vežimėliu</span></div>
     <p class="note">Pasirinkite autobusą, kad pamatytumėte jo stoteles.</p>`;
   } else if(st.stop===null){
-    const b=BUSES[st.bus],Rr=ROUTES[st.bus];
+    const b=BUSES[st.bus],Rr=ROUTES[st.bus],trip=b.dep.find(d=>d>=CHOSEN);
     V.innerHTML=`<button class="back" data-go="list">← Maršrutai</button>${tray()}${picker()}
     <div class="rhead">${busBox(b)}<header><div class="bname">${b.name} autobusas</div><h1><span class="nm">${b.stops[0]}</span> – <span class="nm">${b.stops[b.stops.length-1]}</span></h1></header></div>
-    <div class="label">Stotelės</div>
-    <div class="stops" style="--rc:var(${b.c})">${b.stops.map((sn,k)=>{const kk=Rr.skeys[k],nx=firstDep(b,k,CHOSEN);
+    <div class="label">Stotelės${trip!==undefined?` · reisas, išvykstantis ${fmt(trip)}`:""}</div>
+    <div class="stops" style="--rc:var(${b.c})">${b.stops.map((sn,k)=>{const kk=Rr.skeys[k],nx=trip!==undefined&&trip+b.off[k]<=22*60?trip+b.off[k]:undefined;
       const others=BUSES.filter((o,oi)=>oi!==st.bus&&ROUTES[oi].pos[kk]!==undefined);
       const tag=kk===T.a?`<span class="tag">Pradžia</span>`:kk===T.b?`<span class="tag">Tikslas</span>`:"";
       return `<button class="stop" data-stop="${k}"><span class="dot"></span><span class="sn"><span class="nm">${sn}</span>${others.length?`<span class="xfer" title="Persėdimas">${others.map(o=>`<i style="background:var(${o.c})" title="${o.name}"></i>`).join("")}</span>`:""}${tag}</span><span class="snx tm">${nx!==undefined?fmt(nx):"—"}</span></button>`}).join("")}</div>
-    <p class="note">Spalvoti kvadratėliai rodo, kurie kiti autobusai sustoja toje stotelėje. Pasirinkite stotelę, kad pamatytumėte laikus.</p>`;
+    <p class="note">Rodomas vienas reisas nuo pradžios iki galo: kada tas pats autobusas pasieks kiekvieną stotelę. Spalvoti kvadratėliai rodo, kurie kiti autobusai sustoja toje stotelėje. Pasirinkite stotelę, kad pamatytumėte visus jos laikus.</p>`;
   } else {
     const b=BUSES[st.bus],k=st.stop,list=timesAt(b,k),up=list.filter(m=>m>=CHOSEN),nx=up[0];
     const isPicked=m=>LEGS.some(l=>l.bus===st.bus&&l.stop===k&&l.time===m);
