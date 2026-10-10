@@ -497,8 +497,8 @@ function check(){
 function addLeg(bus,stop,time){
   if(LEGS.some(l=>l.bus===bus&&l.stop===stop&&l.time===time)){TOAST={warn:true,msg:"Šis reisas jau pridėtas."};return}
   if(LEGS.length>=3){TOAST={warn:true,msg:"Visi trys laukeliai užpildyti. Pašalinkite vieną (bakstelėkite jį viršuje), jei norite pakeisti."};return}
-  LEGS.push({bus,stop,time});FB=null;
-  TOAST={msg:`Pridėta į ${LEGS.length} laukelį: ${lc(BUSES[bus].name)} autobusas, ${BUSES[bus].stops[stop]}, ${fmt(time)}.`};
+  const leg={bus,stop,time};LEGS.push(leg);LEGS.sort((x,y)=>x.time-y.time);FB=null;
+  TOAST={msg:`Pridėta į ${LEGS.indexOf(leg)+1} laukelį: ${lc(BUSES[bus].name)} autobusas, ${BUSES[bus].stops[stop]}, ${fmt(time)}.`};
 }
 
 /* ---------- Schedule views: bus → stops → stop timetable → one trip ---------- */
@@ -536,20 +536,22 @@ function render(){
     const b=BUSES[st.bus],k=st.stop,list=timesAt(b,k);
     const isPicked=m=>LEGS.some(l=>l.bus===st.bus&&l.stop===k&&l.time===m);
     const byH={};list.forEach(m=>{(byH[Math.floor(m/60)]??=[]).push(m)});
+    const last=k===b.stops.length-1;
     V.innerHTML=`<div class="navrow"><button class="back" data-go="stops">← Stotelės</button><button class="tomap" data-go="map">Žemėlapis</button></div>${tray()}
     <div class="rhead">${busBox(b)}<header><div class="bname">${b.name} autobusas</div><h1 class="nm">${b.stops[k]}</h1><p>Kryptis: <span class="nm">${b.stops[b.stops.length-1]}</span></p></header></div>
     <div style="--rc:var(${b.c});--rc-fg:${b.fg}">
-      <div class="label" style="margin-bottom:8px">Visas dienos tvarkaraštis</div>
+      ${last?`<p class="toast warn" style="margin:0 0 10px">Galinė stotelė: autobusas čia baigia reisą, į jį įlipti negalima. Laikai rodo, kada autobusas čia atvyksta.</p>`:""}
+      <div class="label" style="margin-bottom:8px">${last?"Atvykimo laikai":"Visas dienos tvarkaraštis"}</div>
       <div class="grid">${Object.keys(byH).map(h=>`<div class="hr"><div class="h tmh">${pad(h)}</div><div class="ms">${byH[h].map(m=>`<button class="tbtn${isPicked(m)?" picked":""}" data-time="${m}" aria-label="${fmt(m)}${isAcc(b,k,m)?", pritaikyta žmonėms su vežimėliu":""}"><span class="tm">${pad(m%60)}</span>${isAcc(b,k,m)?WC:""}</button>`).join("")}</div></div>`).join("")}</div>
     </div>
     <div class="legend">${WC}<span>reisas pritaikytas žmonėms su vežimėliu</span></div>
     <p class="note">Bakstelėkite laiką, kad pamatytumėte, kada šis autobusas pasieks kitas stoteles.</p>`;
   } else {
     const b=BUSES[st.bus],k=st.stop,d=b.dep[st.trip],m=d+b.off[k];
-    const picked=LEGS.some(l=>l.bus===st.bus&&l.stop===k&&l.time===m);
+    const picked=LEGS.some(l=>l.bus===st.bus&&l.stop===k&&l.time===m),last=k===b.stops.length-1;
     V.innerHTML=`<div class="navrow"><button class="back" data-go="times">← Laikai</button><button class="tomap" data-go="map">Žemėlapis</button></div>${tray()}
     <div class="rhead">${busBox(b)}<header><div class="bname">${b.name} autobusas · reisas</div><h1><span class="nm">${b.stops[k]}</span> <span class="tm">${fmt(m)}</span>${isAcc(b,k,m)?WC:""}</h1><p>Kryptis: <span class="nm">${b.stops[b.stops.length-1]}</span></p></header></div>
-    ${picked?`<button class="go small" data-go="map">Įtraukta ✓ · Grįžti į žemėlapį</button>`:`<button class="go small" data-add>Įtraukti į kelionę: <span class="nm">${b.stops[k]}</span> <span class="tm">${fmt(m)}</span></button>`}
+    ${last?`<p class="toast warn" style="margin:0">Galinė stotelė: šis reisas čia baigiasi.</p>`:picked?`<button class="go small" data-go="map">Įtraukta ✓ · Grįžti į žemėlapį</button>`:`<button class="go small" data-add>Įtraukti į kelionę: <span class="nm">${b.stops[k]}</span> <span class="tm">${fmt(m)}</span></button>`}
     <div class="label">Kada šis autobusas bus stotelėse</div>
     ${stopRows(b,st.bus,i=>d+b.off[i],k)}
     <p class="note">Pilkos stotelės jau pravažiuotos. Bakstelėkite stotelę, kad pamatytumėte jos tvarkaraštį.</p>`;
