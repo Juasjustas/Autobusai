@@ -740,7 +740,6 @@ function tutShow(){
   if(el&&!s.noScroll)el.scrollIntoView({block:"center",behavior:"instant"});
   else if(el&&s.noScroll)window.scrollTo({top:Math.max(0,el.getBoundingClientRect().top+scrollY-140),behavior:"instant"});
   requestAnimationFrame(tutPlace);
-  if(!s.last)tTimer=setTimeout(tutAdvance,Math.max(3200,s.text.length*45));
 }
 function tutAdvance(){
   clearTimeout(tTimer);const s=tSteps[tStep];if(!s)return;
