@@ -129,7 +129,11 @@ header p{margin:2px 0 0;color:var(--muted)}
 .xfer{display:inline-flex;gap:3px}
 .xfer i{width:10px;height:10px;border-radius:3px;display:inline-block}
 .tag{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:5px;background:var(--fg);color:var(--bg)}
-.snx{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.85rem;text-align:right}
+.snx{font-variant-numeric:tabular-nums;color:var(--fg);font-weight:600;font-size:.9rem;text-align:right}
+.stop.before{opacity:.45}
+.stop.here{background:var(--accent-soft)}
+.stop.here .dot{background:var(--rc)}
+.go.small[disabled]{box-shadow:none}
 .upcoming{display:flex;gap:8px;flex-wrap:wrap}
 .tbtn{all:unset;box-sizing:border-box;cursor:pointer;font-variant-numeric:tabular-nums}
 .chip{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-weight:500}
@@ -400,7 +404,7 @@ document.getElementById("mapbox").addEventListener("click",e=>{
 const pad=n=>String(n).padStart(2,"0");
 const fmt=m=>pad(Math.floor(m/60))+":"+pad(m%60);
 let ti=0, LEGS=[], FB=null, TOAST=null, CHOSEN=8*60;
-const st={bus:null,stop:null};
+const st={bus:null,stop:null,trip:null};
 const V=document.getElementById("viewRes");
 const BUSICON=`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="15" rx="3" fill="#fff"/><rect x="6" y="5.5" width="12" height="6" rx="1" fill="currentColor"/><circle cx="8" cy="15" r="1.3" fill="currentColor"/><circle cx="16" cy="15" r="1.3" fill="currentColor"/><rect x="6" y="18" width="3" height="3" rx="1" fill="#fff"/><rect x="15" y="18" width="3" height="3" rx="1" fill="#fff"/></svg>`;
 const busBox=b=>`<span class="bus" style="background:var(${b.c});color:var(${b.c})">${BUSICON}</span>`;
@@ -489,85 +493,86 @@ function check(){
 
 function addLeg(bus,stop,time){
   if(LEGS.some(l=>l.bus===bus&&l.stop===stop&&l.time===time)){TOAST={warn:true,msg:"Šis reisas jau pridėtas."};return}
-  if(LEGS.length>=3){TOAST={warn:true,msg:"Visi trys laukeliai užpildyti. Pašalinkite vieną, jei norite pakeisti."};return}
+  if(LEGS.length>=3){TOAST={warn:true,msg:"Visi trys laukeliai užpildyti. Pašalinkite vieną (bakstelėkite jį viršuje), jei norite pakeisti."};return}
   LEGS.push({bus,stop,time});FB=null;
   TOAST={msg:`Pridėta į ${LEGS.length} laukelį: ${lc(BUSES[bus].name)} autobusas, ${BUSES[bus].stops[stop]}, ${fmt(time)}.`};
 }
 
-/* ---------- Schedule views ---------- */
-const picker=()=>`<div class="picker"><label for="ph" class="label">Laikas</label>
-  <select id="ph">${Array.from({length:15},(_,i)=>8+i).map(h=>`<option value="${h}"${Math.floor(CHOSEN/60)===h?" selected":""}>${pad(h)}</option>`).join("")}</select>
-  <span class="colon">:</span>
-  <select id="pm">${Array.from({length:12},(_,i)=>i*5).map(m=>`<option value="${m}"${CHOSEN%60===m?" selected":""}>${pad(m)}</option>`).join("")}</select></div>`;
-function inTxt(m){const d=m-CHOSEN;return d<=0?"tuo metu":d<60?`po ${d} min.`:`po ${Math.floor(d/60)} val. ${d%60} min.`}
+/* ---------- Schedule views: bus → stops → stop timetable → one trip ---------- */
 function tray(){const T=TASKS[ti];
   return `<div class="tray"><div class="label">${nameK(T.a)} → ${nameK(T.b)} · iki ${fmt(T.deadline)}</div>
     <div class="slots">${slotsHTML()}</div>
     ${TOAST?`<div class="toast${TOAST.warn?" warn":""}" role="status">${TOAST.msg}</div>`:""}
     ${LEGS.length===3?`<button class="go small" data-check>Tikrinti</button>`:""}</div>`}
-function busRow(k){const b=BUSES[k],nx=firstDep(b,0,CHOSEN);
+function busRow(k){const b=BUSES[k];
   return `<button class="row" data-bus="${k}">${busBox(b)}
     <span class="info"><span class="bname">${b.name}</span><span class="rname"><span class="nm">${b.stops[0]}</span> – <span class="nm">${b.stops[b.stops.length-1]}</span></span>
-    <span class="top">${nx!==undefined?`<span class="big tm">${fmt(nx)}</span>${isAcc(b,0,nx)?WC:""}<span class="in tm">išvyksta ${inTxt(nx)}</span>`:`<span class="in">Šiandien reisų nebėra</span>`}</span></span></button>`}
+    <span class="in">Stotelių: ${b.stops.length}</span></span></button>`}
+function stopRows(b,busIdx,timeAt,from){const Rr=ROUTES[busIdx],T=TASKS[ti];
+  return `<div class="stops" style="--rc:var(${b.c})">${b.stops.map((sn,k)=>{const kk=Rr.skeys[k];
+    const others=BUSES.filter((o,oi)=>oi!==busIdx&&ROUTES[oi].pos[kk]!==undefined);
+    const tag=kk===T.a?`<span class="tag">Pradžia</span>`:kk===T.b?`<span class="tag">Tikslas</span>`:"";
+    const tm=timeAt?timeAt(k):null;
+    const cls=from===undefined?"":k<from?" before":k===from?" here":"";
+    return `<button class="stop${cls}" data-stop="${k}"><span class="dot"></span><span class="sn"><span class="nm">${sn}</span>${others.length?`<span class="xfer" title="Persėdimas">${others.map(o=>`<i style="background:var(${o.c})" title="${o.name}"></i>`).join("")}</span>`:""}${tag}</span>${tm!=null?`<span class="snx tm">${tm<=22*60?fmt(tm):"—"}</span>`:""}</button>`}).join("")}</div>`}
 
 function render(){
-  const T=TASKS[ti];
   if(st.bus===null){
-    V.innerHTML=`<button class="back" data-go="map">← Žemėlapis</button>${tray()}${picker()}
+    V.innerHTML=`<button class="back" data-go="map">← Žemėlapis</button>${tray()}
     <header><h1>Maršrutai</h1><p>Pinigėnai · 8:00–22:00</p></header>
     <div class="list">${BUSES.map((b,k)=>busRow(k)).join("")}</div>
-    <div class="legend">${WC}<span>reisas pritaikytas žmonėms su vežimėliu</span></div>
     <p class="note">Pasirinkite autobusą, kad pamatytumėte jo stoteles.</p>`;
   } else if(st.stop===null){
-    const b=BUSES[st.bus],Rr=ROUTES[st.bus],trip=b.dep.find(d=>d>=CHOSEN);
-    V.innerHTML=`<button class="back" data-go="list">← Maršrutai</button>${tray()}${picker()}
+    const b=BUSES[st.bus];
+    V.innerHTML=`<button class="back" data-go="list">← Maršrutai</button>${tray()}
     <div class="rhead">${busBox(b)}<header><div class="bname">${b.name} autobusas</div><h1><span class="nm">${b.stops[0]}</span> – <span class="nm">${b.stops[b.stops.length-1]}</span></h1></header></div>
-    <div class="label">Stotelės${trip!==undefined?` · reisas, išvykstantis ${fmt(trip)}`:""}</div>
-    <div class="stops" style="--rc:var(${b.c})">${b.stops.map((sn,k)=>{const kk=Rr.skeys[k],nx=trip!==undefined&&trip+b.off[k]<=22*60?trip+b.off[k]:undefined;
-      const others=BUSES.filter((o,oi)=>oi!==st.bus&&ROUTES[oi].pos[kk]!==undefined);
-      const tag=kk===T.a?`<span class="tag">Pradžia</span>`:kk===T.b?`<span class="tag">Tikslas</span>`:"";
-      return `<button class="stop" data-stop="${k}"><span class="dot"></span><span class="sn"><span class="nm">${sn}</span>${others.length?`<span class="xfer" title="Persėdimas">${others.map(o=>`<i style="background:var(${o.c})" title="${o.name}"></i>`).join("")}</span>`:""}${tag}</span><span class="snx tm">${nx!==undefined?fmt(nx):"—"}</span></button>`}).join("")}</div>
-    <p class="note">Rodomas vienas reisas nuo pradžios iki galo: kada tas pats autobusas pasieks kiekvieną stotelę. Spalvoti kvadratėliai rodo, kurie kiti autobusai sustoja toje stotelėje. Pasirinkite stotelę, kad pamatytumėte visus jos laikus.</p>`;
-  } else {
-    const b=BUSES[st.bus],k=st.stop,list=timesAt(b,k),up=list.filter(m=>m>=CHOSEN),nx=up[0];
+    <div class="label">Stotelės</div>
+    ${stopRows(b,st.bus,null)}
+    <p class="note">Spalvoti kvadratėliai rodo, kurie kiti autobusai sustoja toje stotelėje. Pasirinkite stotelę, kad pamatytumėte jos tvarkaraštį.</p>`;
+  } else if(st.trip===null){
+    const b=BUSES[st.bus],k=st.stop,list=timesAt(b,k);
     const isPicked=m=>LEGS.some(l=>l.bus===st.bus&&l.stop===k&&l.time===m);
     const byH={};list.forEach(m=>{(byH[Math.floor(m/60)]??=[]).push(m)});
-    V.innerHTML=`<button class="back" data-go="stops">← Stotelės</button>${tray()}${picker()}
+    V.innerHTML=`<button class="back" data-go="stops">← Stotelės</button>${tray()}
     <div class="rhead">${busBox(b)}<header><div class="bname">${b.name} autobusas</div><h1 class="nm">${b.stops[k]}</h1><p>Kryptis: <span class="nm">${b.stops[b.stops.length-1]}</span></p></header></div>
-    <div style="--rc:var(${b.c});--rc-fg:${b.fg};display:flex;flex-direction:column;gap:16px">
-      <div><div class="label" style="margin-bottom:8px">Artimiausi išvykimai</div>
-      <div class="upcoming">${up.length?up.slice(0,4).map((m,i)=>`<button class="tbtn chip${i?"":" first"}${isPicked(m)?" picked":""}" data-time="${m}"><span class="tm">${fmt(m)}</span>${isAcc(b,k,m)?WC:""}${i?"":`<small class="tm">${inTxt(m)}</small>`}</button>`).join(""):`<span class="chip">Šiandien reisų nebėra</span>`}</div></div>
-      <div><div class="label" style="margin-bottom:8px">Visas dienos tvarkaraštis</div>
-      <div class="grid">${Object.keys(byH).map(h=>`<div class="hr"><div class="h tmh">${pad(h)}</div><div class="ms">${byH[h].map(m=>`<button class="tbtn${m===nx?" nx":m<CHOSEN?" past":""}${isPicked(m)?" picked":""}" data-time="${m}" aria-label="${fmt(m)}${isAcc(b,k,m)?", pritaikyta žmonėms su vežimėliu":""}"><span class="tm">${pad(m%60)}</span>${isAcc(b,k,m)?WC:""}</button>`).join("")}</div></div>`).join("")}</div></div>
+    <div style="--rc:var(${b.c});--rc-fg:${b.fg}">
+      <div class="label" style="margin-bottom:8px">Visas dienos tvarkaraštis</div>
+      <div class="grid">${Object.keys(byH).map(h=>`<div class="hr"><div class="h tmh">${pad(h)}</div><div class="ms">${byH[h].map(m=>`<button class="tbtn${isPicked(m)?" picked":""}" data-time="${m}" aria-label="${fmt(m)}${isAcc(b,k,m)?", pritaikyta žmonėms su vežimėliu":""}"><span class="tm">${pad(m%60)}</span>${isAcc(b,k,m)?WC:""}</button>`).join("")}</div></div>`).join("")}</div>
     </div>
     <div class="legend">${WC}<span>reisas pritaikytas žmonėms su vežimėliu</span></div>
-    <p class="note">Bakstelėkite laiką, kad įtrauktumėte šį reisą į savo kelionę.</p>`;
+    <p class="note">Bakstelėkite laiką, kad pamatytumėte, kada šis autobusas pasieks kitas stoteles.</p>`;
+  } else {
+    const b=BUSES[st.bus],k=st.stop,d=b.dep[st.trip],m=d+b.off[k];
+    const picked=LEGS.some(l=>l.bus===st.bus&&l.stop===k&&l.time===m);
+    V.innerHTML=`<button class="back" data-go="times">← Laikai</button>${tray()}
+    <div class="rhead">${busBox(b)}<header><div class="bname">${b.name} autobusas · reisas</div><h1><span class="nm">${b.stops[k]}</span> <span class="tm">${fmt(m)}</span>${isAcc(b,k,m)?WC:""}</h1><p>Kryptis: <span class="nm">${b.stops[b.stops.length-1]}</span></p></header></div>
+    <button class="go small" data-add ${picked?"disabled":""}>${picked?"Jau įtraukta į kelionę":`Įtraukti į kelionę: <span class="nm">${b.stops[k]}</span> <span class="tm">${fmt(m)}</span>`}</button>
+    <div class="label">Kada šis autobusas bus stotelėse</div>
+    ${stopRows(b,st.bus,i=>d+b.off[i],k)}
+    <p class="note">Pilkos stotelės jau pravažiuotos. Bakstelėkite stotelę, kad pamatytumėte jos tvarkaraštį.</p>`;
   }
 }
 V.addEventListener("click",e=>{
-  const t=e.target.closest("[data-go],[data-bus],[data-stop],[data-time],[data-rm],[data-check]");if(!t)return;
-  const keepScroll=t.dataset.time!==undefined||t.dataset.rm!==undefined;
+  const t=e.target.closest("[data-go],[data-bus],[data-stop],[data-time],[data-rm],[data-check],[data-add]");if(!t||t.disabled)return;
+  const keepScroll=t.dataset.rm!==undefined||t.dataset.add!==undefined;
   if(t.dataset.check!==undefined){check();show(false);setTimeout(()=>document.getElementById("fb").scrollIntoView({block:"center"}),0);return}
   if(t.dataset.go==="map"){show(false);return}
-  if(t.dataset.time!==undefined){addLeg(st.bus,st.stop,+t.dataset.time);render();return}
+  if(t.dataset.add!==undefined){const b=BUSES[st.bus];addLeg(st.bus,st.stop,b.dep[st.trip]+b.off[st.stop]);render();return}
   if(t.dataset.rm!==undefined){LEGS.splice(+t.dataset.rm,1);FB=null;TOAST=null;render();return}
   TOAST=null;
-  if(t.dataset.go==="list"){st.bus=null;st.stop=null}
-  else if(t.dataset.go==="stops"){st.stop=null}
-  else if(t.dataset.bus!==undefined){st.bus=+t.dataset.bus;st.stop=null}
-  else if(t.dataset.stop!==undefined){st.stop=+t.dataset.stop}
+  if(t.dataset.go==="list"){st.bus=null;st.stop=null;st.trip=null}
+  else if(t.dataset.go==="stops"){st.stop=null;st.trip=null}
+  else if(t.dataset.go==="times"){st.trip=null}
+  else if(t.dataset.bus!==undefined){st.bus=+t.dataset.bus;st.stop=null;st.trip=null}
+  else if(t.dataset.stop!==undefined){st.stop=+t.dataset.stop;st.trip=null}
+  else if(t.dataset.time!==undefined){const b=BUSES[st.bus];st.trip=b.dep.indexOf(+t.dataset.time-b.off[st.stop])}
   render();if(!keepScroll)window.scrollTo(0,0);
-});
-V.addEventListener("change",e=>{
-  if(e.target.id!=="ph"&&e.target.id!=="pm")return;
-  CHOSEN=Math.min(22*60,(+document.getElementById("ph").value)*60+(+document.getElementById("pm").value));
-  render();
 });
 function show(res){
   document.getElementById("viewMap").hidden=res;V.hidden=!res;window.scrollTo(0,0);
-  if(res){TOAST=null;render()}else renderMap();
+  if(res){TOAST=null;st.bus=null;st.stop=null;st.trip=null;render()}else renderMap();
 }
-function startTask(i){ti=i;LEGS=[];FB=null;TOAST=null;st.bus=null;st.stop=null;if(TASKS[ti])CHOSEN=Math.floor(TASKS[ti].T0/5)*5;renderMap()}
+function startTask(i){ti=i;LEGS=[];FB=null;TOAST=null;st.bus=null;st.stop=null;st.trip=null;if(TASKS[ti])CHOSEN=Math.floor(TASKS[ti].T0/5)*5;renderMap()}
 document.getElementById("go").addEventListener("click",()=>show(true));
 document.getElementById("check").addEventListener("click",()=>{check();renderMap()});
 document.getElementById("viewMap").addEventListener("click",e=>{
