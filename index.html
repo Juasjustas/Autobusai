@@ -550,7 +550,7 @@ function drawLegs(){
 function slotsHTML(){
   return [0,1,2].map(i=>{const l=LEGS.find(x=>x.slot===i);
     const cell=l?`<button class="slot full" data-rm="${i}" style="--rc:var(${BUSES[l.bus].c});--rc-fg:${BUSES[l.bus].fg}" aria-label="Pašalinti: ${BUSES[l.bus].name} autobusas, ${legName(l)}, ${fmt(l.time)}"><span class="x">×</span><span class="stime"><span class="tm">${fmt(l.time)}</span>${isAcc(BUSES[l.bus],l.stop,l.time)?WC:""}</span><span class="sstop nm">${legName(l)}</span></button>`
-                :`<button class="slot pick${TARGET===i?" target":""}" data-pick="${i}" aria-label="Pasirinkti ${ORD[i]} autobusą"><span class="snum">${i+1}</span><span class="sadd">${TARGET===i?"renkama…":"+ pasirinkti"}</span></button>`;
+                :`<button class="slot pick${TARGET===i?" target":""}" data-pick="${i}" aria-label="Pasirinkti ${ORD[i]} autobusą"><span class="snum">${i+1}</span></button>`;
     return (i?`<span class="plus">+</span>`:"")+cell}).join("");
 }
 
