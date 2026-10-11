@@ -584,7 +584,7 @@ function renderMap(){
   document.getElementById("fb").innerHTML=FB?(FB.ok
     ?`<div class="fb ok"><strong>Teisingai!</strong><span>${FB.msg}</span>${PHASE==="demo"?"":`<button class="go small" data-next>${nextLbl}</button>`}</div>`
     :`<div class="fb err"><strong>Dar ne visai.</strong><span>${FB.msg}</span></div>`):"";
-  renderEnd();drawTaskMarks();drawLegs();
+  renderEnd();drawTaskMarks();drawLegs();save();
 }
 function renderEnd(){
   const w=document.getElementById("endwrap");
@@ -831,8 +831,32 @@ window.addEventListener("click",e=>{
   try{el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window,clientX:x,clientY:y,detail:1}))}finally{redirecting=false}
 },true);
 document.getElementById("modes").addEventListener("click",e=>{const b=e.target.closest("[data-mode]");if(b)setMode(b.dataset.mode)});
+/* ---------- Keep progress on the phone (a reload continues) and keep the back button inside the game ---------- */
+const SAVEKEY="pinigenai-v2";
+function save(){try{if(PHASE==="practice"||PHASE==="cond")localStorage.setItem(SAVEKEY,JSON.stringify({PHASE,ti,pi,CONDN,CONDQ,MODE,LEGS,RESULTS}))}catch(e){}}
+function restore(){
+  try{
+    if(location.hash==="#naujas"){localStorage.removeItem(SAVEKEY);history.replaceState(null,"",location.pathname+location.search);return false}
+    const d=JSON.parse(localStorage.getItem(SAVEKEY)||"null");
+    if(!d||(d.PHASE!=="practice"&&d.PHASE!=="cond")||!TASKS[d.ti])return false;
+    PHASE=d.PHASE;pi=d.pi||0;CONDN=d.CONDN||0;CONDQ=Array.isArray(d.CONDQ)?d.CONDQ:[];RESULTS=d.RESULTS||[];
+    setMode(d.MODE||"normal");loadTask(d.ti);
+    LEGS=(d.LEGS||[]).filter(l=>BUSES[l.bus]&&BUSES[l.bus].stops[l.stop]!==undefined&&[0,1,2].includes(l.slot));
+    renderMap();return true;
+  }catch(e){return false}
+}
+try{history.pushState({pinigenai:1},"")}catch(e){}
+addEventListener("popstate",()=>{
+  if(TUT.hidden&&!V.hidden){
+    TOAST=null;
+    if(st.trip!==null)st.trip=null;else if(st.stop!==null)st.stop=null;else if(st.bus!==null)st.bus=null;else show(false);
+    if(!V.hidden){render();window.scrollTo(0,0)}
+  }
+  try{history.pushState({pinigenai:1},"")}catch(e){}
+});
+addEventListener("hashchange",()=>{if(location.hash==="#naujas"){try{localStorage.removeItem(SAVEKEY);history.replaceState(null,"",location.pathname+location.search)}catch(e){}newSession();startTutorial()}});
 newSession();
-startTutorial();
+if(!restore())startTutorial();
 </script>
 
 </body>
