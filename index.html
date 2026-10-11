@@ -253,7 +253,7 @@ for(let j=0;j<=RW;j++)for(let i=0;i<C;i++){if(j===0||j===RW||j===AV_ROW||R()>.15
 for(let j=0;j<RW;j++)for(let i=0;i<=C;i++){if(i===0||i===C||i===AV_COL||R()>.15)E.add(`v${i},${j}`)}
 const ek=(i,j,di,dj)=>di?`h${Math.min(i,i+di)},${j}`:`v${i},${Math.min(j,j+dj)}`;
 
-const ROUTES=[{c:"--r1"},{c:"--r4"},{c:"--r3"},{c:"--r5"}];
+const ROUTES=[{c:"--r1"},{c:"--r4"},{c:"--r3"},{c:"--r2"}];
 const usedStarts=new Set();
 function walk(h){
   const maxF=h?C:RW, maxL=h?RW:C;
@@ -280,7 +280,7 @@ const WAY=[
   [[0,4],[5,4],[5,2],[12,2]],        // Raudonas: west → east, upper part
   [[8,0],[8,9],[10,9],[10,15]],      // Mėlynas: north → south, east side
   [[12,11],[5,11],[5,8],[0,8]],      // Žalias: east → west, lower middle
-  [[2,0],[2,13],[7,13],[7,15]]];     // Violetinis: north → south, west side
+  [[2,0],[2,13],[7,13],[7,15]]];     // Geltonas: north → south, west side
 const expand=w=>{const out=[w[0].slice()];for(let k=1;k<w.length;k++){let [i,j]=out[out.length-1];const [ti,tj]=w[k];
   while(i!==ti||j!==tj){if(i!==ti)i+=Math.sign(ti-i);else j+=Math.sign(tj-j);out.push([i,j])}}return out};
 ROUTES.forEach((r,k)=>{r.nodes=expand(WAY[k]);
@@ -307,8 +307,8 @@ ROUTES.forEach(r=>{
 });
 
 /* Timetables: one direction per route, 8:00–22:00 */
-const COLORNAME=["Raudonas","Mėlynas","Žalias","Violetinis"];
-const BUSES=ROUTES.map((r,k)=>({r:k,c:r.c,fg:"#fff",name:COLORNAME[k]}));
+const COLORNAME=["Raudonas","Mėlynas","Žalias","Geltonas"];
+const BUSES=ROUTES.map((r,k)=>({r:k,c:r.c,fg:r.c==="--r2"?"var(--r2-fg)":"#fff",name:COLORNAME[k]}));
 const TR=rng(8222026);
 const rnd=(a,b)=>a+Math.floor(TR()*(b-a+1));
 BUSES.forEach(b=>{
