@@ -581,9 +581,9 @@ function renderMap(){
 function renderEnd(){
   const w=document.getElementById("endwrap");
   if(PHASE==="demo"||PHASE==="done"){w.innerHTML="";return}
-  const lbl=PHASE==="practice"?"Baigti mokomąją dalį":"Baigti užduotį";
+  const lbl=PHASE==="practice"?"Kita užduotis":"Baigti užduotį";
   w.innerHTML=CONFIRM
-    ?`<div class="endconfirm"><p>${PHASE==="practice"?"Ar tikrai norite baigti mokomąją dalį ir pereiti prie užduoties?":"Ar tikrai norite baigti šią užduotį?"}</p><div class="row2"><button class="endbtn" data-endyes>Taip, baigti</button><button class="endno" data-endno>Ne</button></div></div>`
+    ?`<div class="endconfirm"><p>${PHASE==="practice"?"Ar tikrai norite pereiti prie kitos užduoties?":"Ar tikrai norite baigti šią užduotį?"}</p><div class="row2"><button class="endbtn" data-endyes>${PHASE==="practice"?"Taip, toliau":"Taip, baigti"}</button><button class="endno" data-endno>Ne</button></div></div>`
     :`<button class="endbtn" data-end>${lbl}</button>`;
 }
 
