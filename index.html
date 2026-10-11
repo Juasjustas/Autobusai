@@ -247,7 +247,7 @@ for(let j=0;j<=RW;j++)for(let i=0;i<C;i++){if(j===0||j===RW||j===AV_ROW||R()>.15
 for(let j=0;j<RW;j++)for(let i=0;i<=C;i++){if(i===0||i===C||i===AV_COL||R()>.15)E.add(`v${i},${j}`)}
 const ek=(i,j,di,dj)=>di?`h${Math.min(i,i+di)},${j}`:`v${i},${Math.min(j,j+dj)}`;
 
-const ROUTES=[{c:"--r1",h:false},{c:"--r2",h:true},{c:"--r3",h:true},{c:"--r4",h:true},{c:"--r5",h:true},{c:"--r6",h:false}];
+const ROUTES=[{c:"--r1"},{c:"--r4"},{c:"--r3"},{c:"--r5"}];
 const usedStarts=new Set();
 function walk(h){
   const maxF=h?C:RW, maxL=h?RW:C;
@@ -269,8 +269,17 @@ function walk(h){
   }
   return pts.map(([f,l])=>at(f,l));
 }
-ROUTES.forEach(r=>r.nodes=walk(r.h));
-const OFF=[-11,-6.6,-2.2,2.2,6.6,11];
+/* Simpler network: four lines with a few turns, drawn along streets (missing street pieces are added) */
+const WAY=[
+  [[0,4],[5,4],[5,2],[12,2]],        // Raudonas: west → east, upper part
+  [[8,0],[8,9],[10,9],[10,15]],      // Mėlynas: north → south, east side
+  [[12,11],[5,11],[5,8],[0,8]],      // Žalias: east → west, lower middle
+  [[2,0],[2,13],[7,13],[7,15]]];     // Violetinis: north → south, west side
+const expand=w=>{const out=[w[0].slice()];for(let k=1;k<w.length;k++){let [i,j]=out[out.length-1];const [ti,tj]=w[k];
+  while(i!==ti||j!==tj){if(i!==ti)i+=Math.sign(ti-i);else j+=Math.sign(tj-j);out.push([i,j])}}return out};
+ROUTES.forEach((r,k)=>{r.nodes=expand(WAY[k]);
+  for(let q=1;q<r.nodes.length;q++){const [a,b]=r.nodes[q-1],[c,d]=r.nodes[q];E.add(c!==a?`h${Math.min(a,c)},${b}`:`v${a},${Math.min(b,d)}`)}});
+const OFF=[-6.6,-2.2,2.2,6.6];
 /* Parallel lanes: offset each line sideways along every street, using one fixed side per street
    direction so two lines on the same street never land on top of each other */
 function laneOffset(P,o){
@@ -287,18 +296,18 @@ function laneOffset(P,o){
 const key=nd=>nd[0]+","+nd[1];
 const cnt={};ROUTES.forEach(r=>new Set(r.nodes.map(key)).forEach(k=>cnt[k]=(cnt[k]||0)+1));
 ROUTES.forEach(r=>{
-  r.sq=[];r.nodes.forEach((nd,q)=>{if(q===0||q===r.nodes.length-1||q%2===0||cnt[key(nd)]>1)r.sq.push(q)});
+  r.sq=[];r.nodes.forEach((nd,q)=>{if(q===0||q===r.nodes.length-1||q%3===0||cnt[key(nd)]>1)r.sq.push(q)});
   r.skeys=r.sq.map(q=>key(r.nodes[q]));r.pos={};r.skeys.forEach((k,i)=>r.pos[k]=i);
 });
 
 /* Timetables: one direction per route, 8:00–22:00 */
-const COLORNAME=["Raudonas","Geltonas","Žalias","Mėlynas","Violetinis","Rudas"];
-const BUSES=ROUTES.map((r,k)=>({r:k,c:r.c,fg:`var(--r${k+1}-fg)`,name:COLORNAME[k]}));
+const COLORNAME=["Raudonas","Mėlynas","Žalias","Violetinis"];
+const BUSES=ROUTES.map((r,k)=>({r:k,c:r.c,fg:"#fff",name:COLORNAME[k]}));
 const TR=rng(8222026);
 const rnd=(a,b)=>a+Math.floor(TR()*(b-a+1));
 BUSES.forEach(b=>{
   const n=ROUTES[b.r].skeys.length;
-  b.dep=[];let m=8*60+rnd(0,15);while(m<=22*60){b.dep.push(m);m+=rnd(18,45)}
+  const every=[20,15,20,30][b.r];b.dep=[];let m=8*60+rnd(0,every-1);while(m<=22*60){b.dep.push(m);m+=every}
   b.off=[0];for(let k=1;k<n;k++)b.off.push(b.off[k-1]+rnd(2,4));
 });
 const AR=rng(4242);
@@ -333,13 +342,13 @@ let cands=[];
 for(const a of allStops){const d=legsFrom(a);for(const b of allStops)if(d[b]===3)cands.push([a,b])}
 if(cands.length<3)for(const a of allStops){const d=legsFrom(a);for(const b of allStops)if(d[b]===2)cands.push([a,b])}
 const TRk=rng(777);for(let i=cands.length-1;i>0;i--){const j=Math.floor(TRk()*(i+1));[cands[i],cands[j]]=[cands[j],cands[i]]}
-const STARTS=[9*60,12*60+20,16*60+40,8*60+15,10*60+45,14*60+5,18*60+30,11*60+30];
+const STARTS=[9*60,8*60+15,10*60+45,12*60+20,14*60+5,16*60+40,11*60+30,13*60+15,18*60+30,9*60+40,15*60+30,17*60+20,19*60+10];
 const NT=STARTS.length;
 const TASKS=[];const usedK=new Set();
 for(const pass of [0,1])for(const [a,b] of cands){
   if(TASKS.length===NT)break;
   if(pass===0&&(usedK.has(a)||usedK.has(b)))continue;
-  if(TASKS.some(t=>(t.a===a&&t.b===b)||t.a===a))continue;
+  if(TASKS.some(t=>(t.a===a&&t.b===b)||(pass===0&&t.a===a)))continue;
   const T0=STARTS[TASKS.length];let best=null;
   for(const ch of chains(a,b)){const e=evalChain(ch,a,b,T0);if(e&&(!best||e.arr<best.arr))best={...e,ch}}
   if(!best)continue;
@@ -471,47 +480,7 @@ const legName=l=>BUSES[l.bus].stops[l.stop];
 BUSES.forEach(b=>b.stops=ROUTES[b.r].stops);
 
 let LEGINFO={};
-/* ---------- Starter world: same city, three short lines along main streets, regular buses ---------- */
-const MAIN={routes:ROUTES.slice(),buses:BUSES.slice(),keyXY:{...keyXY},nodeName:{...nodeName},svg:s};
-const TAIL=s.slice(s.indexOf(`<g transform="translate(${W-30},34)">`));
-const MINI=(()=>{
-  const rng0=(a,b)=>Array.from({length:b-a+1},(_,i)=>a+i);
-  const defs=[
-    {c:"--r1",name:"Raudonas",nodes:rng0(0,8).map(i=>[i,7]),stopAt:[0,2,4,6,8],names:["Parko g.","Saulės g.","Turgaus aikštė","Centras","Muziejus"],first:8*60+5,every:20},
-    {c:"--r4",name:"Mėlynas",nodes:rng0(2,15).map(j=>[6,j]),stopAt:[0,2,5,8,11,13],names:["Ligoninė","Liepų g.","Centras","Tilto g.","Sodų g.","Stotis"],first:8*60,every:15},
-    {c:"--r3",name:"Žalias",nodes:rng0(6,12).map(i=>[i,15]),stopAt:[0,2,4,6],names:["Stotis","Ežero g.","Paštas","Miško g."],first:8*60+15,every:30}];
-  const routes=[],buses=[],kxy={},nn={};let rc="",rl="",st="";
-  defs.forEach((D,k)=>{
-    const r={c:D.c,nodes:D.nodes,sq:D.stopAt};
-    r.skeys=r.sq.map(q=>key(r.nodes[q]));r.pos={};r.skeys.forEach((kk,i)=>{r.pos[kk]=i;nn[kk]=D.names[i]});
-    const pts=r.nodes.map(([i,j])=>N[j][i]);r.pts=pts;r.stops=D.names.slice();
-    const d=rpath(pts,12);
-    rc+=`<path d="${d}" stroke-width="7.4"/>`;rl+=`<path d="${d}" stroke="var(${r.c})" stroke-width="5"/>`+arrowsFor(pts,r.c,1.8);
-    r.sq.forEach((q,si)=>{const kk=r.skeys[si],nm=D.names[si],p=pts[q],x=Math.min(W-8,Math.max(8,p[0])),y=Math.min(H-8,Math.max(8,p[1]));
-      kxy[kk]??=[x,y];const big=si===0||si===r.sq.length-1||nm==="Centras"||nm==="Stotis";
-      st+=`<g class="sdot" data-k="${kk}" data-x="${f1(x)}" data-y="${f1(y)}" data-n="${nm}" data-c="${r.c}"><circle cx="${f1(x)}" cy="${f1(y)}" r="10" fill="transparent"/><circle class="vis" cx="${f1(x)}" cy="${f1(y)}" r="${big?4.2:3.4}" fill="var(--street)" stroke="var(${r.c})" stroke-width="2"/></g>`});
-    const b={r:k,c:D.c,fg:"#fff",name:D.name,stops:r.stops,dep:[]};
-    for(let m=D.first;m<=21*60+45;m+=D.every)b.dep.push(m);
-    b.off=r.sq.map(q=>(q-r.sq[0])*2);b.acc=b.dep.map((_,i)=>i%2===0);
-    routes.push(r);buses.push(b);
-  });
-  const svg=BASE+`<g fill="none" stroke="var(--street)" stroke-linecap="round" stroke-linejoin="round">${rc}</g><g id="routelines" fill="none" stroke-linecap="round" stroke-linejoin="round">${rl}</g><g id="leglines" fill="none" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"></g>${st}<g id="legdots" pointer-events="none"></g><g id="leglabels" pointer-events="none"></g>`+TAIL;
-  return {routes,buses,keyXY:kxy,nodeName:nn,svg};
-})();
-let CURW=MAIN;
-function useWorld(w){if(CURW===w)return;CURW=w;
-  ROUTES.splice(0,ROUTES.length,...w.routes);BUSES.splice(0,BUSES.length,...w.buses);
-  for(const k in keyXY)delete keyXY[k];Object.assign(keyXY,w.keyXY);
-  for(const k in nodeName)delete nodeName[k];Object.assign(nodeName,w.nodeName);
-  document.getElementById("mapbox").innerHTML=w.svg;LEGINFO={};}
-/* the starter task: Saulės g. → Paštas from 9:00, three buses, generous deadline */
-useWorld(MINI);
-const STARTER={a:"2,7",b:"10,15",T0:9*60};
-{let best=null;for(const ch of chains(STARTER.a,STARTER.b)){const e=evalChain(ch,STARTER.a,STARTER.b,STARTER.T0);if(e&&(!best||e.arr<best.arr))best={...e,ch}}
- STARTER.best=best;STARTER.deadline=Math.ceil((best.arr+15)/5)*5;
- while(new Set(solutions(STARTER,STARTER.deadline).map(solSig)).size<2)STARTER.deadline+=5;}
-useWorld(MAIN);
-TASKS.push(STARTER);const STARTER_I=TASKS.length-1;
+
 const lc=s=>s.charAt(0).toLowerCase()+s.slice(1);
 
 function drawTaskMarks(){
@@ -590,7 +559,7 @@ function renderMap(){
     document.getElementById("fb").innerHTML=`<button class="go small" data-restart>Pradėti iš naujo</button>`;
     renderEnd();drawTaskMarks();drawLegs();return;
   }
-  const label=PHASE==="demo"?"Pavyzdys":PHASE==="practice"?(ti===STARTER_I?"Pradinė užduotis":`Mokomoji užduotis ${pi}`):PHASE==="cond1"?"1 užduotis":"2 užduotis";
+  const label=PHASE==="demo"?"Pavyzdys":PHASE==="practice"?`Mokomoji užduotis ${pi+1}`:PHASE==="cond1"?"1 užduotis":"2 užduotis";
   taskEl.innerHTML=`<div class="task"><div class="label">${label}</div>
     <div class="trip">${nameK(T.a)}<span class="arrow">→</span>${nameK(T.b)}</div>
     <div class="meta">Stotelėje esate <b>${fmt(T.T0)}</b>. Atvykti reikia iki <b>${fmt(T.deadline)}</b>. Kelionė trimis skirtingais autobusais.</div></div>`;
@@ -717,14 +686,14 @@ function show(res){
 }
 /* ---------- Session flow: tutorial → practice → condition 1 → (if solved) condition 2 → summary ---------- */
 let PHASE="demo",CONDS=[],CONDTASKS=[],RESULTS=[],pi=0,CONFIRM=false;
-const PRACTICE=[STARTER_I,1,2,3];
+const PRACTICE=TASKS.slice(1,9).map((_,i)=>i+1),CONDPOOL=TASKS.map((_,i)=>i).slice(9);
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-function loadTask(i){useWorld(i===STARTER_I?MINI:MAIN);ti=i;LEGS=[];FB=null;TOAST=null;CONFIRM=false;st.bus=null;st.stop=null;st.trip=null;
+function loadTask(i){ti=i;LEGS=[];FB=null;TOAST=null;CONFIRM=false;st.bus=null;st.stop=null;st.trip=null;
   document.getElementById("viewMap").hidden=false;V.hidden=true;renderMap();window.scrollTo(0,0)}
-function newSession(){CONDS=shuffle(["grey","smush","offset"]);CONDTASKS=shuffle([4,5,6,7]).slice(0,2);RESULTS=[];pi=0}
+function newSession(){CONDS=shuffle(["grey","smush","offset"]);CONDTASKS=shuffle(CONDPOOL).slice(0,2);RESULTS=[];pi=0}
 function startPractice(){PHASE="practice";setMode("normal");pi=0;loadTask(PRACTICE[0])}
 function startCond(n){PHASE="cond"+n;setMode(CONDS[n-1]);loadTask(CONDTASKS[n-1])}
-function finish(){PHASE="done";useWorld(MAIN);setMode("normal");ti=null;LEGS=[];FB=null;CONFIRM=false;
+function finish(){PHASE="done";setMode("normal");ti=null;LEGS=[];FB=null;CONFIRM=false;
   document.getElementById("viewMap").hidden=false;V.hidden=true;renderMap();window.scrollTo(0,0)}
 function endTask(){
   if(PHASE==="practice"){startCond(1);return}
@@ -732,7 +701,7 @@ function endTask(){
   if(PHASE==="cond1"&&solved)startCond(2);else finish();
 }
 function nextAfterOk(){
-  if(PHASE==="practice"){pi=pi+1<PRACTICE.length?pi+1:1;loadTask(PRACTICE[pi]);return}
+  if(PHASE==="practice"){pi=(pi+1)%PRACTICE.length;loadTask(PRACTICE[pi]);return}
   RESULTS.push({mode:MODE,task:ti,ok:true});
   if(PHASE==="cond1")startCond(2);else finish();
 }
