@@ -574,13 +574,13 @@ function renderMap(){
     document.getElementById("fb").innerHTML=`<button class="go small" data-restart>Pradėti iš naujo</button>`;
     renderEnd();drawTaskMarks();drawLegs();return;
   }
-  const label=PHASE==="demo"?"Pavyzdys":PHASE==="practice"?`Mokomoji užduotis ${pi+1}`:PHASE==="cond1"?"1 užduotis":"2 užduotis";
+  const label=PHASE==="demo"?"Pavyzdys":PHASE==="practice"?`Mokomoji užduotis ${pi+1}`:`${CONDN} užduotis`;
   taskEl.innerHTML=`<div class="task"><div class="label">${label}</div>
     <div class="trip">${nameK(T.a)}<span class="arrow">→</span>${nameK(T.b)}</div>
     <div class="meta">Stotelėje esate <b>${fmt(T.T0)}</b>. Atvykti reikia iki <b>${fmt(T.deadline)}</b>. Kelionė trimis skirtingais autobusais.</div></div>`;
   document.getElementById("slots").innerHTML=slotsHTML();
   document.getElementById("check").disabled=LEGS.length<3;
-  const nextLbl=PHASE==="practice"?"Kita mokomoji užduotis →":PHASE==="cond1"?"Toliau →":"Baigti";
+  const nextLbl=PHASE==="practice"?"Kita mokomoji užduotis →":"Kita užduotis →";
   document.getElementById("fb").innerHTML=FB?(FB.ok
     ?`<div class="fb ok"><strong>Teisingai!</strong><span>${FB.msg}</span>${PHASE==="demo"?"":`<button class="go small" data-next>${nextLbl}</button>`}</div>`
     :`<div class="fb err"><strong>Dar ne visai.</strong><span>${FB.msg}</span></div>`):"";
@@ -589,9 +589,9 @@ function renderMap(){
 function renderEnd(){
   const w=document.getElementById("endwrap");
   if(PHASE==="demo"||PHASE==="done"){w.innerHTML="";return}
-  const lbl=PHASE==="practice"?"Kita užduotis":"Baigti užduotį";
+  const lbl="Kita užduotis";
   w.innerHTML=CONFIRM
-    ?`<div class="endconfirm"><p>${PHASE==="practice"?"Ar tikrai norite pereiti prie kitos užduoties?":"Ar tikrai norite baigti šią užduotį?"}</p><div class="row2"><button class="endbtn" data-endyes>${PHASE==="practice"?"Taip, toliau":"Taip, baigti"}</button><button class="endno" data-endno>Ne</button></div></div>`
+    ?`<div class="endconfirm"><p>Ar tikrai norite pereiti prie kitos užduoties?</p><div class="row2"><button class="endbtn" data-endyes>Taip, toliau</button><button class="endno" data-endno>Ne</button></div></div>`
     :`<button class="endbtn" data-end>${lbl}</button>`;
 }
 
@@ -702,27 +702,36 @@ function show(res){
   document.getElementById("viewMap").hidden=res;V.hidden=!res;window.scrollTo(0,0);
   if(res){TOAST=null;st.bus=null;st.stop=null;st.trip=null;render()}else renderMap();
 }
-/* ---------- Session flow: tutorial → practice → condition 1 → (if solved) condition 2 → summary ---------- */
-let PHASE="demo",CONDS=[],CONDTASKS=[],RESULTS=[],pi=0,CONFIRM=false;
+/* ---------- Session flow: tutorial → practice → condition tasks, one after another without end.
+   Each new task gets a different condition than the previous one and a task not used recently. ---------- */
+let PHASE="demo",RESULTS=[],pi=0,CONFIRM=false,CONDN=0,CONDQ=[];
 const PRACTICE=TASKS.slice(1,9).map((_,i)=>i+1),CONDPOOL=TASKS.map((_,i)=>i).slice(9);
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 function loadTask(i){ti=i;LEGS=[];TARGET=null;FB=null;TOAST=null;CONFIRM=false;st.bus=null;st.stop=null;st.trip=null;
   document.getElementById("viewMap").hidden=false;V.hidden=true;renderMap();window.scrollTo(0,0)}
-function newSession(){CONDS=shuffle(["grey","smush","offset"]);CONDTASKS=shuffle(CONDPOOL).slice(0,2);RESULTS=[];pi=0}
+function newSession(){RESULTS=[];pi=0;CONDN=0;CONDQ=shuffle(CONDPOOL)}
 function startPractice(){PHASE="practice";setMode("normal");pi=0;loadTask(PRACTICE[0])}
-function startCond(n){PHASE="cond"+n;setMode(CONDS[n-1]);loadTask(CONDTASKS[n-1])}
+function nextCondTask(){
+  if(!CONDQ.length)CONDQ=shuffle([...CONDPOOL,...PRACTICE]).filter(t=>t!==ti);   // after the 4 condition tasks, reuse others
+  return CONDQ.shift();
+}
+function startCond(){
+  const choices=["grey","smush","offset"].filter(m=>m!==MODE);
+  const mode=choices[Math.floor(Math.random()*choices.length)];
+  PHASE="cond";CONDN++;setMode(mode);loadTask(nextCondTask());
+}
 function finish(){PHASE="done";setMode("normal");ti=null;LEGS=[];FB=null;CONFIRM=false;
   document.getElementById("viewMap").hidden=false;V.hidden=true;renderMap();window.scrollTo(0,0)}
 function endTask(){
-  if(PHASE==="practice"){startCond(1);return}
-  const solved=!!(FB&&FB.ok);RESULTS.push({mode:MODE,task:ti,ok:solved});
-  if(PHASE==="cond1"&&solved)startCond(2);else finish();
+  if(PHASE==="cond")RESULTS.push({mode:MODE,task:ti,ok:!!(FB&&FB.ok)});
+  startCond();
 }
 function nextAfterOk(){
   if(PHASE==="practice"){pi=(pi+1)%PRACTICE.length;loadTask(PRACTICE[pi]);return}
   RESULTS.push({mode:MODE,task:ti,ok:true});
-  if(PHASE==="cond1")startCond(2);else finish();
+  startCond();
 }
+
 document.getElementById("go").addEventListener("click",()=>{const f=[0,1,2].find(i=>!LEGS.some(x=>x.slot===i));TARGET=f===undefined?null:f;show(true)});
 document.getElementById("check").addEventListener("click",()=>{check();renderMap()});
 document.getElementById("viewMap").addEventListener("click",e=>{
